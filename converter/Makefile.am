@@ -1,7 +1,7 @@
 AM_CFLAGS = $(PACKAGE_CFLAGS) -I$(top_srcdir)/include
 AM_LDFLAGS = -lpopt
 
-bin_PROGRAMS = babeltrace babeltrace-log
+bin_PROGRAMS = babeltrace babeltrace-log test-live
 
 babeltrace_SOURCES = \
 	babeltrace.c
@@ -24,6 +24,21 @@ babeltrace_log_LDADD = \
 	$(top_builddir)/lib/libbabeltrace.la \
 	$(top_builddir)/formats/ctf/libbabeltrace-ctf.la \
 	$(top_builddir)/compat/libcompat.la
+
+test_live_SOURCES = \
+		     test-live.c
+
+# -Wl,--no-as-needed is needed for recent gold linker who seems to think
+# it knows better and considers libraries with constructors having
+# side-effects as dead code.
+test_live_LDFLAGS = -Wl,--no-as-needed
+test_live_LDADD = \
+		   $(top_builddir)/lib/libbabeltrace.la \
+		   $(top_builddir)/formats/ctf/libbabeltrace-ctf.la \
+		   $(top_builddir)/compat/libcompat.la \
+		   $(top_builddir)/formats/ctf-text/libbabeltrace-ctf-text.la \
+		   $(top_builddir)/formats/ctf-metadata/libbabeltrace-ctf-metadata.la \
+		   $(top_builddir)/formats/bt-dummy/libbabeltrace-dummy.la
 
 if BABELTRACE_BUILD_WITH_LIBUUID
 babeltrace_log_LDADD += -luuid
