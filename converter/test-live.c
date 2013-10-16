@@ -65,12 +65,9 @@ struct viewer_stream {
 	uint64_t ctf_trace_id;
 	void *mmap_base;
 	int fd;
-	int ro_fd;
-	int index_fd;
 	int metadata_flag;
 	int first_read;
 	char path[PATH_MAX];
-	char idx_path[PATH_MAX];
 };
 
 struct live_session {
@@ -256,6 +253,7 @@ int attach_session(int id)
 
 	rq.session_id = htobe64(id);
 	rq.seek = htobe32(VIEWER_SEEK_BEGINNING);
+	//rq.seek = htobe32(VIEWER_SEEK_LAST);
 
 	do {
 		ret = send(control_sock, &cmd, sizeof(cmd), 0);
@@ -307,19 +305,6 @@ int attach_session(int id)
 				stream.channel_name);
 		session->streams[i].id = be64toh(stream.id);
 
-		unlink("testlivetrace");
-		mkdir("testlivetrace", S_IRWXU | S_IRWXG);
-		snprintf(session->streams[i].path,
-				sizeof(session->streams[i].path),
-				"testlivetrace/%s",
-				stream.channel_name);
-		ret = open(session->streams[i].path,
-				O_WRONLY | O_CREAT | O_TRUNC,
-				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-		if (ret < 0) {
-			goto error;
-		}
-		session->streams[i].fd = ret;
 		session->streams[i].ctf_trace_id = be64toh(stream.ctf_trace_id);
 		session->streams[i].first_read = 1;
 		session->streams[i].mmap_base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE,
@@ -329,31 +314,22 @@ int attach_session(int id)
 			ret = -1;
 			goto error;
 		}
-		/* Read-side */
-		ret = open(session->streams[i].path, O_RDONLY);
-		if (ret < 0) {
-			goto error;
-		}
-		session->streams[i].ro_fd = ret;
 
 		if (be32toh(stream.metadata_flag)) {
 			session->streams[i].metadata_flag = 1;
-			session->streams[i].index_fd = -1;
-		} else {
-			snprintf(session->streams[i].idx_path,
-					sizeof(session->streams[i].idx_path),
-					"testlivetrace/%s.idx", stream.channel_name);
-			ret = open(session->streams[i].idx_path,
+			unlink("testlivetrace");
+			mkdir("testlivetrace", S_IRWXU | S_IRWXG);
+			snprintf(session->streams[i].path,
+					sizeof(session->streams[i].path),
+					"testlivetrace/%s",
+					stream.channel_name);
+			ret = open(session->streams[i].path,
 					O_WRONLY | O_CREAT | O_TRUNC,
 					S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 			if (ret < 0) {
 				goto error;
 			}
-			session->streams[i].index_fd = ret;
-			ret = write_index_header(session->streams[i].index_fd);
-			if (ret < 0) {
-				goto error;
-			}
+			session->streams[i].fd = ret;
 		}
 	}
 	ret = 0;
@@ -594,10 +570,6 @@ int get_next_index(int id, struct packet_index *index)
 	cmd.data_size = sizeof(rq);
 	cmd.cmd_version = 0;
 
-	if (session->streams[id].index_fd < 0) {
-		ret = -1;
-		goto error;
-	}
 	fprintf(stderr, "  - get next index for stream %" PRIu64 "\n",
 			session->streams[id].id);
 	rq.stream_id = htobe64(session->streams[id].id);
