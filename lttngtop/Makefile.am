@@ -1,0 +1,20 @@
+AM_CFLAGS = $(PACKAGE_CFLAGS)
+
+bin_PROGRAMS = lttngtop
+
+noinst_HEADERS = \
+	lttngtoptypes.h \
+	common.h \
+	cputop.h \
+	cursesdisplay.h \
+	iostreamtop.h
+
+lttngtop_SOURCES = \
+	lttngtop.c \
+	common.c \
+	cursesdisplay.c \
+	cputop.c \
+	iostreamtop.c
+
+#lttngtop_LDADD = -lbabeltrace -lbabeltrace-ctf -llttngtop-helper -llttng-ctl -lurcu -llttngtopmmappacketseek -llttng-ust-ctl
+lttngtop_LDADD = -lbabeltrace -lbabeltrace-ctf -llttng-ctl -lurcu -llttng-ust-ctl -lncurses -lpanel
