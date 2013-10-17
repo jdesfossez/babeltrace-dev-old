@@ -49,9 +49,12 @@
 #include "iostreamtop.h"
 #include "cursesdisplay.h"
 #include "common.h"
+#include "live.h"
 
 
 #include "babeltrace/format.h"
+#include "include/lttng-index.h"
+#include "babeltrace/ctf/types.h"
 
 #define DEFAULT_FILE_ARRAY_SIZE 1
 
@@ -937,7 +940,11 @@ int check_requirements(struct bt_context *ctx)
 	int ppid_check = 0;
 	int ret = 0;
 
-	bt_ctf_get_event_decl_list(0, ctx, &evt_list, &evt_cnt);
+	ret = bt_ctf_get_event_decl_list(0, ctx, &evt_list, &evt_cnt);
+	if (ret < 0) {
+		goto end;
+	}
+
 	for (i = 0; i < evt_cnt; i++) {
 		bt_ctf_get_decl_fields(evt_list[i], BT_STREAM_EVENT_CONTEXT,
 				&field_list, &field_cnt);
@@ -975,6 +982,7 @@ int check_requirements(struct bt_context *ctx)
 		fprintf(stderr, "[error] missing procname context information\n");
 	}
 
+end:
 	return ret;
 }
 
@@ -1358,8 +1366,33 @@ int main(int argc, char **argv)
 			signal(SIGINT, handle_textdump_sigterm);
 		}
 		if (remote_live) {
-
+			ret = setup_network_live(opt_relay_hostname);
+			if (ret < 0) {
+				goto end;
+			}
 		}
+
+		if (!opt_textdump) {
+			pthread_create(&display_thread, NULL, ncurses_display, (void *) NULL);
+			pthread_create(&timer_thread, NULL, refresh_thread, (void *) NULL);
+		}
+
+		ret = open_trace(&bt_ctx);
+		if (ret < 0) {
+			goto end;
+		}
+
+		ret = check_requirements(bt_ctx);
+		if (ret < 0) {
+			fprintf(stderr, "[error] some mandatory contexts were missing, exiting.\n");
+			goto end;
+		}
+
+		iter_trace(bt_ctx);
+
+
+
+
 #if LTTNGTOP_MMAP_LIVE
 		struct bt_mmap_stream *mmap_info;
 
@@ -1367,13 +1400,7 @@ int main(int argc, char **argv)
 		if (ret < 0) {
 			goto end;
 		}
-#endif
 
-		if (!opt_textdump) {
-			pthread_create(&display_thread, NULL, ncurses_display, (void *) NULL);
-			pthread_create(&timer_thread, NULL, refresh_thread, (void *) NULL);
-		}
-#if LTTNGTOP_MMAP_LIVE
 		while (!quit) {
 			reload_trace = 0;
 			live_consume(&bt_ctx);

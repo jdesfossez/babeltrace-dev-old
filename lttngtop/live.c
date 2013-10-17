@@ -76,6 +76,7 @@ struct live_session {
 	uint64_t stream_count;
 };
 
+static
 int connect_viewer(char *hostname)
 {
 	struct hostent *host;
@@ -117,6 +118,7 @@ end:
 	return ret;
 }
 
+static
 int establish_connection(void)
 {
 	struct lttng_viewer_cmd cmd;
@@ -252,8 +254,8 @@ int attach_session(int id)
 	cmd.cmd_version = 0;
 
 	rq.session_id = htobe64(id);
-	rq.seek = htobe32(VIEWER_SEEK_BEGINNING);
-	//rq.seek = htobe32(VIEWER_SEEK_LAST);
+	//rq.seek = htobe32(VIEWER_SEEK_BEGINNING);
+	rq.seek = htobe32(VIEWER_SEEK_LAST);
 
 	do {
 		ret = send(control_sock, &cmd, sizeof(cmd), 0);
@@ -724,28 +726,19 @@ end:
 	return;
 }
 
-void live_read(void)
+int open_trace(struct bt_context **bt_ctx)
 {
 	struct bt_mmap_stream *new_mmap_stream;
 	struct bt_mmap_stream_list mmap_list;
-	struct bt_context *bt_ctx;
 	FILE *metadata_fp = NULL;
 	struct bt_ctf_iter *iter;
 	const struct bt_ctf_event *event;
 	struct bt_iter_pos begin_pos;
-	int ret, i;
-	struct bt_trace_descriptor *td_write;
-	struct bt_format *fmt_write;
-	struct ctf_text_stream_pos *sout;
+	int i;
+	int ret = 0;
 	int skip = 0;
 
-	fmt_write = bt_lookup_format(g_quark_from_static_string("text"));
-	if (!fmt_write) {
-		fprintf(stderr, "ctf-text error\n");
-		goto end;
-	}
-
-	bt_ctx = bt_context_create();
+	*bt_ctx = bt_context_create();
 	BT_INIT_LIST_HEAD(&mmap_list.head);
 
 	for (i = 0; i < session->stream_count; i++) {
@@ -778,25 +771,14 @@ void live_read(void)
 		goto end;
 	}
 
-	ret = bt_context_add_trace(bt_ctx, NULL, "ctf",
+	ret = bt_context_add_trace(*bt_ctx, NULL, "ctf",
 			ctf_live_packet_seek, &mmap_list, metadata_fp);
 	if (ret < 0) {
 		fprintf(stderr, "Error adding trace\n");
 		goto end;
 	}
 
-	td_write = fmt_write->open_trace(NULL, O_RDWR, NULL, NULL);
-	if (!td_write) {
-		fprintf(stderr, "Error opening output trace\n");
-		goto end;
-	}
-
-	sout = container_of(td_write, struct ctf_text_stream_pos,
-			trace_descriptor);
-	       if (!sout->parent.event_cb)
-		       goto end;
-
-
+	/*
 	begin_pos.type = BT_SEEK_BEGIN;
 	iter = bt_ctf_iter_create(bt_ctx, &begin_pos, NULL);
 	while ((event = bt_ctf_iter_read_event(iter)) != NULL) {
@@ -817,33 +799,19 @@ void live_read(void)
 		}
 		skip = 0;
 	}
+	*/
 
 end:
-	return;
+	return ret;
 }
 
-int main(int argc, char **argv)
+int setup_network_live(char *hostname)
 {
 	int ret;
 	int session_id;
-	char *hostname = NULL;
 
 	session = zmalloc(sizeof(struct live_session));
 	if (!session) {
-		goto error;
-	}
-
-	if (argc > 1) {
-		hostname = zmalloc((strlen(argv[1]) + 1) * sizeof(char));
-		if (!hostname) {
-			perror("malloc");
-			ret = -1;
-			goto error;
-		}
-		strncpy(hostname, argv[1], strlen(argv[1]) * sizeof(char));
-	} else {
-		printf("Usage : %s hostname\n", argv[0]);
-		ret = -1;
 		goto error;
 	}
 
@@ -879,12 +847,10 @@ int main(int argc, char **argv)
 		}
 	} while (session->stream_count == 0);
 
-	live_read();
-
 end:
+	return 0;
+
 error:
-	if (hostname)
-		free(hostname);
 	free(session->streams);
 	fprintf(stderr, "* Exiting %d\n", ret);
 	return ret;
