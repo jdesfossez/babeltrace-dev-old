@@ -670,9 +670,15 @@ void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 	pos->mmap_base_offset = 0;
 	pos->offset = 0;
 
-	file_stream->parent.cycles_timestamp = packet_index.timestamp_end;
-	file_stream->parent.real_timestamp = ctf_get_real_timestamp(
-			&file_stream->parent, packet_index.timestamp_end);
+	if (packet_index.content_size == 0) {
+		file_stream->parent.cycles_timestamp = packet_index.timestamp_end;
+		file_stream->parent.real_timestamp = ctf_get_real_timestamp(
+				&file_stream->parent, packet_index.timestamp_end);
+	} else {
+		file_stream->parent.cycles_timestamp = packet_index.timestamp_begin;
+		file_stream->parent.real_timestamp = ctf_get_real_timestamp(
+				&file_stream->parent, packet_index.timestamp_begin);
+	}
 
 	if (pos->packet_size == 0) {
 		goto end;
