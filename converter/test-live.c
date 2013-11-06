@@ -843,6 +843,10 @@ int main(int argc, char **argv)
 	int session_id;
 	char *hostname = NULL;
 
+	/* set default */
+	opt_context_field_names = 1;
+	opt_payload_field_names = 1;
+
 	session = zmalloc(sizeof(struct live_session));
 	if (!session) {
 		goto error;
