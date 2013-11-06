@@ -632,6 +632,7 @@ retry:
 		fprintf(stderr, "(HUP)\n");
 		session->streams[id].id = -1ULL;
 		session->streams[id].fd = -1;
+		index->offset = EOF;
 		break;
 	case VIEWER_INDEX_ERR:
 		fprintf(stderr, "(ERR)\n");
@@ -668,7 +669,11 @@ void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 	pos->packet_size = packet_index.packet_size;
 	pos->content_size = packet_index.content_size;
 	pos->mmap_base_offset = 0;
-	pos->offset = 0;
+	if (packet_index.offset == EOF) {
+		pos->offset = EOF;
+	} else {
+		pos->offset = 0;
+	}
 
 	if (packet_index.content_size == 0) {
 		file_stream->parent.cycles_timestamp = packet_index.timestamp_end;
@@ -681,6 +686,10 @@ void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 	}
 
 	if (pos->packet_size == 0) {
+		goto end;
+	}
+
+	if (pos->offset == EOF) {
 		goto end;
 	}
 
