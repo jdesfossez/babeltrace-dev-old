@@ -202,10 +202,10 @@ int list_sessions(void)
 			goto error;
 		}
 		fprintf(stderr, "    - %" PRIu64 " : %s on host %s (timer = %u, "
-				"%u client(s) connected)\n",
+				"%u stream(s), %u client(s) connected)\n",
 				be64toh(lsession.id), lsession.session_name,
 				lsession.hostname, be32toh(lsession.live_timer),
-				be32toh(lsession.clients));
+				be32toh(lsession.streams), be32toh(lsession.clients));
 		if (first_session <= 0) {
 			first_session = be64toh(lsession.id);
 		}
