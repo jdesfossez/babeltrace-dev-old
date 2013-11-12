@@ -414,6 +414,9 @@ int get_data_packet(int id, uint64_t offset,
 		fprintf(stderr, "ERR\n");
 		ret = -1;
 		goto end;
+	case VIEWER_GET_PACKET_EOF:
+		ret = -2;
+		goto error;
 	default:
 		fprintf(stderr, "UNKNOWN\n");
 		ret = -1;
@@ -638,6 +641,9 @@ retry:
 		fprintf(stderr, "(ERR)\n");
 		ret = -1;
 		goto error;
+	case VIEWER_INDEX_EOF:
+		ret = -1;
+		goto error;
 	default:
 		fprintf(stderr, "SHOULD NOT HAPPEN\n");
 		ret = -1;
@@ -656,6 +662,7 @@ void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 	struct packet_index packet_index;
 	int ret;
 
+retry:
 	pos = ctf_pos(stream_pos);
 	file_stream = container_of(pos, struct ctf_file_stream, pos);
 
@@ -696,7 +703,9 @@ void ctf_live_packet_seek(struct bt_stream_pos *stream_pos, size_t index,
 	fprintf(stderr, "BT GET_DATA_PACKET\n");
 	ret = get_data_packet(pos->fd, be64toh(packet_index.offset),
 			packet_index.packet_size / CHAR_BIT);
-	if (ret < 0) {
+	if (ret == -2) {
+		goto retry;
+	} else if (ret < 0) {
 		fprintf(stderr, "get_data_packet failed");
 		return;
 	}
