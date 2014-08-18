@@ -1,11 +1,8 @@
+#ifndef _BABELTRACE_LIMITS_H
+#define _BABELTRACE_LIMITS_H
+
 /*
- * Common Trace Format
- *
- * Strings read/write functions.
- *
- * Copyright 2010-2011 EfficiOS Inc. and Linux Foundation
- *
- * Author: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+ * Copyright (C) 2014 Jérémie Galarneau <jeremie.galarneau@efficios.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,33 +23,24 @@
  * SOFTWARE.
  */
 
-#include <babeltrace/ctf-text/types.h>
-#include <stdio.h>
-#include <babeltrace/compat/limits.h>		/* C99 limits */
-#include <string.h>
+#include <limits.h>
 
-int ctf_text_string_write(struct bt_stream_pos *ppos,
-			  struct bt_definition *definition)
-{
-	struct definition_string *string_definition =
-		container_of(definition, struct definition_string, p);
-	struct ctf_text_stream_pos *pos = ctf_text_pos(ppos);
+#ifdef __linux__
 
-	assert(string_definition->value != NULL);
+#define BABELTRACE_HOST_NAME_MAX HOST_NAME_MAX
 
-	if (!print_field(definition))
-		return 0;
+#elif defined(__FreeBSD__)
 
-	if (pos->dummy)
-		return 0;
+#define BABELTRACE_HOST_NAME_MAX MAXHOSTNAMELEN
 
-	if (pos->field_nr++ != 0)
-		fprintf(pos->fp, ",");
-	fprintf(pos->fp, " ");
-	if (pos->print_names)
-		fprintf(pos->fp, "%s = ",
-			rem_(g_quark_to_string(definition->name)));
+#elif defined(_POSIX_HOST_NAME_MAX)
 
-	fprintf(pos->fp, "\"%s\"", string_definition->value);
-	return 0;
-}
+#define BABELTRACE_HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+
+#else
+
+#define BABELTRACE_HOST_NAME_MAX 256
+
+#endif /* __linux__, __FreeBSD__, _POSIX_HOST_NAME_MAX */
+
+#endif /* _BABELTRACE_LIMITS_H */
