@@ -27,6 +27,8 @@
 #include <stdint.h>
 #include "lttng-viewer-abi.h"
 
+#include <libmemcached/memcached.h>
+
 #define LTTNG_DEFAULT_NETWORK_VIEWER_PORT	5344
 
 #define LTTNG_STATE_MAJOR			2
@@ -44,6 +46,9 @@ struct lttng_state_ctx {
 	struct lttng_state_session *session;
 	struct bt_context *bt_ctx;
 	GArray *session_ids;
+
+	/* State tracker specifics */
+	memcached_st *memc;
 };
 
 struct lttng_state_viewer_stream {

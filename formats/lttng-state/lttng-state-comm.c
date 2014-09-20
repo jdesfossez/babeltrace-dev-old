@@ -57,6 +57,8 @@
 #include "lttng-viewer-abi.h"
 #include "lttng-state-track.h"
 
+#include <libmemcached/memcached.h>
+
 #define ACTIVE_POLL_DELAY	100	/* ms */
 
 /*
@@ -1669,6 +1671,11 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 			fprintf(stderr, "[error] Iterator creation error\n");
 			goto end;
 		}
+		ret = lttng_state_init(ctx);
+		if (ret < 0) {
+			fprintf(stderr, "[error] State tracker init\n");
+			goto end;
+		}
 		for (;;) {
 			if (lttng_state_should_quit()) {
 				ret = 0;
@@ -1680,7 +1687,8 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 					/* End of trace */
 					break;
 				}
-				ret = lttng_state_process_event(&sout->parent,
+				ret = lttng_state_process_event(ctx,
+						&sout->parent,
 						event->parent->stream);
 				if (ret) {
 					fprintf(stderr, "[error] Writing "
