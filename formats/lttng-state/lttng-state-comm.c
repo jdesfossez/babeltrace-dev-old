@@ -55,6 +55,7 @@
 
 #include "lttng-state.h"
 #include "lttng-viewer-abi.h"
+#include "lttng-state-track.h"
 
 #define ACTIVE_POLL_DELAY	100	/* ms */
 
@@ -1679,7 +1680,7 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 					/* End of trace */
 					break;
 				}
-				ret = sout->parent.event_cb(&sout->parent,
+				ret = lttng_state_process_event(&sout->parent,
 						event->parent->stream);
 				if (ret) {
 					fprintf(stderr, "[error] Writing "

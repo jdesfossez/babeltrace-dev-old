@@ -4,10 +4,11 @@ lib_LTLIBRARIES = libbabeltrace-lttng-state.la
 
 noinst_HEADERS = \
 		 lttng-viewer-abi.h \
-		 lttng-state.h
+		 lttng-state.h \
+		 lttng-state-track.h
 
 libbabeltrace_lttng_state_la_SOURCES = \
-	lttng-state-plugin.c lttng-state-comm.c
+	lttng-state-plugin.c lttng-state-comm.c lttng-state-track.c
 
 # Request that the linker keeps all static libraries objects.
 libbabeltrace_lttng_state_la_LDFLAGS = \
