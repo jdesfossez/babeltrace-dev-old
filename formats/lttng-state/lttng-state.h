@@ -25,9 +25,9 @@
  */
 
 #include <stdint.h>
-#include "lttng-viewer-abi.h"
+#include <hiredis/hiredis.h>
 
-#include <libmemcached/memcached.h>
+#include "lttng-viewer-abi.h"
 
 #define LTTNG_DEFAULT_NETWORK_VIEWER_PORT	5344
 
@@ -48,7 +48,7 @@ struct lttng_state_ctx {
 	GArray *session_ids;
 
 	/* State tracker specifics */
-	memcached_st *memc;
+	redisContext *redis;
 };
 
 struct lttng_state_viewer_stream {

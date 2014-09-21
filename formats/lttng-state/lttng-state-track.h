@@ -24,8 +24,6 @@
  * SOFTWARE.
  */
 
-#include <libmemcached/memcached.h>
-
 #include <babeltrace/types.h>
 #include <babeltrace/ctf-ir/metadata.h>
 

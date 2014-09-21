@@ -13,7 +13,7 @@ libbabeltrace_lttng_state_la_SOURCES = \
 # Request that the linker keeps all static libraries objects.
 libbabeltrace_lttng_state_la_LDFLAGS = \
 	-Wl,--no-as-needed -version-info $(BABELTRACE_LIBRARY_VERSION)
-libbabeltrace_lttng_state_la_LDFLAGS += -lmemcached
+#libbabeltrace_lttng_state_la_LDFLAGS += -lhiredis
 
 libbabeltrace_lttng_state_la_LIBADD = \
 	$(top_builddir)/lib/libbabeltrace.la

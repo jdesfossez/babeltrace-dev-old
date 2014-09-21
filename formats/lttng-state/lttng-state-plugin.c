@@ -37,7 +37,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <libmemcached/memcached.h>
 #include "lttng-state.h"
 
 static volatile int should_quit;

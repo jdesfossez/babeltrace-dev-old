@@ -57,8 +57,6 @@
 #include "lttng-viewer-abi.h"
 #include "lttng-state-track.h"
 
-#include <libmemcached/memcached.h>
-
 #define ACTIVE_POLL_DELAY	100	/* ms */
 
 /*
