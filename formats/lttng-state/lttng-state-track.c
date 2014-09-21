@@ -5,6 +5,8 @@
 #include "lttng-state-track.h"
 
 #define LIST_DELIM "|"
+#define HOSTNAMES_KEY "hostnames"
+#define SESSIONS_SUFFIX "_sessions"
 
 static
 int mc_set(struct lttng_state_ctx *ctx, char *key, char *value)
@@ -108,16 +110,15 @@ int add_session(struct lttng_state_ctx *ctx)
 	int ret;
 	char *key;
 	int len;
-	const char *suffix = "_sessions";
 
-	len = sizeof(ctx->traced_hostname) + sizeof(suffix);
+	len = strlen(ctx->traced_hostname) + sizeof(SESSIONS_SUFFIX);
 
 	key = malloc(len * sizeof(char));
 	if (!key) {
 		ret = -1;
 		goto end;
 	}
-	ret = sprintf(key, "%s%s", ctx->traced_hostname, suffix);
+	ret = sprintf(key, "%s" SESSIONS_SUFFIX, ctx->traced_hostname);
 	if (ret < 0)
 		goto end_free;
 	ret = mc_append(ctx, key, ctx->session_name, 1);
@@ -148,7 +149,7 @@ int connect_memcached(struct lttng_state_ctx *ctx)
 		ret = -1;
 		goto end;
 	}
-	ret = mc_append(ctx, "hostnames", ctx->traced_hostname, 1);
+	ret = mc_append(ctx, HOSTNAMES_KEY, ctx->traced_hostname, 1);
 	if (ret < 0)
 		goto end;
 
