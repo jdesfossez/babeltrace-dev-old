@@ -276,6 +276,8 @@ enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
 	if (!reply) {
 		goto error;
 	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 

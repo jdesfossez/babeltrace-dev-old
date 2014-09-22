@@ -6,18 +6,9 @@ local timestamp = ARGV[1]
 local cpu_id = ARGV[2]
 local ret = ARGV[3]
 
-local t = redis.call("GET", KEYS[1]..":cpus:"..cpu_id..":current_tid")
-if not t then
-	return nil
-end
-
-local event = redis.call("GET", KEYS[1]..":tids:"..t..":current_syscall")
-if not event then
-	return nil
-end
-
-local name = redis.call("GET", KEYS[1]..":events:"..event..":event_name")
-if name == "sys_open" then
+-- function forward definitions
+local do_sys_open
+function do_sys_open(t, ret, name, event, timestamp, cpu_id)
 	-- we could track open errors here
 	if tonumber(ret) < 0 then
 		return 0
@@ -46,10 +37,26 @@ if name == "sys_open" then
 	redis.call("SET", base_key..":created", timestamp..":"..cpu_id)
 	local path = redis.call("GET", KEYS[1]..":events:"..event..":path")
 	redis.call("SET", base_key..":path", path)
+end
+
+local t = redis.call("GET", KEYS[1]..":cpus:"..cpu_id..":current_tid")
+if not t then
+	return nil
+end
+
+local event = redis.call("GET", KEYS[1]..":tids:"..t..":current_syscall")
+if not event then
+	return nil
+end
+
+local name = redis.call("GET", KEYS[1]..":events:"..event..":event_name")
+if name == "sys_open" then
+	do_sys_open(t, ret, name, event, timestamp, cpu_id)
 else
 	return 0
 end
 
+redis.log(redis.LOG_NOTICE, "ret2: "..ret..", name: "..name)
 redis.call("DEL", KEYS[1]..":tids:"..t..":current_syscall")
 
 redis.call("RPUSH", KEYS[1]..":events", event)
@@ -57,3 +64,4 @@ redis.call("SET", KEYS[1]..":events:"..event..":event_name", "exit_syscall")
 redis.call("SET", KEYS[1]..":events:"..event..":ret", ret)
 
 return 0
+
