@@ -187,10 +187,10 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 	cpu_id = get_cpu_id(call_data);
 
 	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
-			" %s %" PRId64 " %s %" PRId64,
+			" %s %" PRId64 " %s %" PRId64 " %" PRIu64,
 			REDIS_SCHED_SWITCH,
 			ctx->traced_hostname, ctx->session_name, timestamp,
-			prev_comm, prev_tid, next_comm, next_tid);
+			prev_comm, prev_tid, next_comm, next_tid, cpu_id);
 	if (!reply) {
 		freeReplyObject(reply);
 		goto error;
