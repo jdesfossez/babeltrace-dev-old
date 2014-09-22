@@ -20,3 +20,5 @@ if not s then
 end
 
 redis.call("SET", KEYS[1]..":cpus:"..cpu_id..":current_tid", next_tid..":"..s)
+
+return 0

@@ -1685,6 +1685,9 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 					/* End of trace */
 					break;
 				}
+				if (flags & BT_ITER_FLAG_LOST_EVENTS) {
+					fprintf(stderr, "Lost events, expect chaos\n");
+				}
 				ret = lttng_state_process_event(ctx,
 						&sout->parent,
 						event->parent->stream);

@@ -61,7 +61,6 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			parent_pid, child_comm, child_tid, child_pid);
 	if (!reply) {
-		freeReplyObject(reply);
 		goto error;
 	}
 	freeReplyObject(reply);
@@ -192,7 +191,6 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			prev_comm, prev_tid, next_comm, next_tid, cpu_id);
 	if (!reply) {
-		freeReplyObject(reply);
 		goto error;
 	}
 	freeReplyObject(reply);
@@ -235,10 +233,51 @@ enum bt_cb_ret handle_sys_open(struct bt_ctf_event *call_data,
 			REDIS_SYS_OPEN, ctx->traced_hostname,
 			ctx->session_name, timestamp, cpu_id, filename);
 	if (!reply) {
-		freeReplyObject(reply);
 		goto error;
 	}
 	freeReplyObject(reply);
+
+	return BT_CB_OK;
+
+error:
+	return BT_CB_ERROR_STOP;
+}
+
+enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
+		void *private_data)
+{
+	const struct bt_definition *scope;
+	unsigned long timestamp;
+	int64_t ret;
+	uint64_t cpu_id;
+	redisReply *reply;
+	struct lttng_state_ctx *ctx = private_data;
+	redisContext *c = ctx->redis;
+
+	timestamp = bt_ctf_get_timestamp(call_data);
+	if (timestamp == -1ULL)
+		goto error;
+
+	scope = bt_ctf_get_top_level_scope(call_data,
+			BT_EVENT_FIELDS);
+	ret = bt_ctf_get_int64(bt_ctf_get_field(call_data,
+				scope, "_ret"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing ret info\n");
+		goto error;
+	}
+
+	cpu_id = get_cpu_id(call_data);
+
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+			" %" PRId64 " %" PRId64,
+			REDIS_EXIT_SYSCALL, ctx->traced_hostname,
+			ctx->session_name, timestamp, cpu_id, ret);
+	if (!reply) {
+		goto error;
+	}
+	freeReplyObject(reply);
+
 
 	return BT_CB_OK;
 

@@ -11,4 +11,7 @@ if not s then
 	return nil
 end
 
-redis.call("SET", KEYS[1]..":tids:"..tid..":"..s..":terminated", timestamp)
+local t = tid..":"..s
+redis.call("SET", KEYS[1]..":tids:"..t..":terminated", timestamp)
+
+return 0
