@@ -1,8 +1,12 @@
 #include <hiredis/hiredis.h>
 #include <glib.h>
 #include <stdio.h>
+#include <babeltrace/context.h>
+#include <babeltrace/trace-handle.h>
+#include <babeltrace/ctf/callbacks.h>
 #include "lttng-state.h"
 #include "lttng-state-track.h"
+#include "lua_scripts.h"
 
 static
 int add_session(struct lttng_state_ctx *ctx)
@@ -56,9 +60,16 @@ end:
 	return ret;
 }
 
-int lttng_state_init(struct lttng_state_ctx *ctx)
+int lttng_state_init(struct lttng_state_ctx *ctx, struct bt_ctf_iter *iter)
 {
 	int ret;
+
+	bt_ctf_iter_add_callback(iter,
+			g_quark_from_static_string("sched_process_fork"),
+			ctx, 0, handle_sched_process_fork, NULL, NULL, NULL);
+	bt_ctf_iter_add_callback(iter,
+			g_quark_from_static_string("sched_process_free"),
+			ctx, 0, handle_sched_process_free, NULL, NULL, NULL);
 
 	if (!ctx->redis) {
 		ret = connect_redis(ctx);

@@ -27,8 +27,13 @@
 #include <babeltrace/types.h>
 #include <babeltrace/ctf-ir/metadata.h>
 
-int lttng_state_init(struct lttng_state_ctx *ctx);
+int lttng_state_init(struct lttng_state_ctx *ctx, struct bt_ctf_iter *iter);
 int lttng_state_process_event(struct lttng_state_ctx *ctx,
 	struct bt_stream_pos *ppos, struct ctf_stream_definition *stream);
+
+enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
+		void *private_data);
+enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
+		void *private_data);
 
 #endif /* LTTNG_STATE_TRACK_H */

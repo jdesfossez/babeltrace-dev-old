@@ -8,7 +8,7 @@ noinst_HEADERS = \
 		 lttng-state-track.h
 
 libbabeltrace_lttng_state_la_SOURCES = \
-	lttng-state-plugin.c lttng-state-comm.c lttng-state-track.c
+	lttng-state-plugin.c lttng-state-comm.c lttng-state-track.c event-cb.c
 
 # Request that the linker keeps all static libraries objects.
 libbabeltrace_lttng_state_la_LDFLAGS = \

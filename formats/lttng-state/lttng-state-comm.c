@@ -1669,7 +1669,7 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 			fprintf(stderr, "[error] Iterator creation error\n");
 			goto end;
 		}
-		ret = lttng_state_init(ctx);
+		ret = lttng_state_init(ctx, iter);
 		if (ret < 0) {
 			fprintf(stderr, "[error] State tracker init\n");
 			goto end;

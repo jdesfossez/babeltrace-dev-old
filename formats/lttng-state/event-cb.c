@@ -1,0 +1,123 @@
+#include <hiredis/hiredis.h>
+#include <glib.h>
+#include <stdio.h>
+#include <babeltrace/context.h>
+#include <babeltrace/trace-handle.h>
+#include <babeltrace/ctf/callbacks.h>
+#include "lttng-state.h"
+#include "lttng-state-track.h"
+#include "lua_scripts.h"
+
+enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
+		void *private_data)
+{
+	const struct bt_definition *scope;
+	int64_t child_tid, parent_pid, child_pid;
+	uint64_t timestamp;
+	char *child_comm;
+	redisReply *reply;
+	struct lttng_state_ctx *ctx = private_data;
+	redisContext *c = ctx->redis;
+
+	timestamp = bt_ctf_get_timestamp(call_data);
+	if (timestamp == -1ULL)
+		goto error;
+
+	scope = bt_ctf_get_top_level_scope(call_data,
+			BT_EVENT_FIELDS);
+	child_comm = bt_ctf_get_char_array(bt_ctf_get_field(call_data,
+				scope, "_child_comm"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing child_comm context info\n");
+		goto error;
+	}
+
+	child_tid = bt_ctf_get_int64(bt_ctf_get_field(call_data,
+				scope, "_child_tid"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing child_tid field\n");
+		goto error;
+	}
+
+	child_pid = bt_ctf_get_int64(bt_ctf_get_field(call_data,
+				scope, "_child_pid"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing child_pid field\n");
+		goto error;
+	}
+
+	parent_pid = bt_ctf_get_int64(bt_ctf_get_field(call_data,
+				scope, "_parent_pid"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing parent_pid field\n");
+		goto error;
+	}
+	fprintf(stderr, "TS: %lu, %ld %s %ld %ld\n", timestamp, parent_pid, child_comm,
+			child_tid, child_pid);
+
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRId64 \
+			" %s %" PRId64 " %" PRId64 " %" PRId64,
+			REDIS_SCHED_PROCESS_FORK,
+			ctx->traced_hostname, ctx->session_name, timestamp,
+			parent_pid, child_comm, child_tid, child_pid);
+	if (!reply) {
+		freeReplyObject(reply);
+		goto error;
+	}
+	freeReplyObject(reply);
+
+	return BT_CB_OK;
+
+error:
+	return BT_CB_ERROR_STOP;
+}
+
+enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
+		void *private_data)
+{
+	const struct bt_definition *scope;
+	uint64_t timestamp;
+	char *comm;
+	int64_t tid;
+	redisReply *reply;
+	struct lttng_state_ctx *ctx = private_data;
+	redisContext *c = ctx->redis;
+
+	timestamp = bt_ctf_get_timestamp(call_data);
+	if (timestamp == -1ULL)
+		goto error;
+
+	scope = bt_ctf_get_top_level_scope(call_data,
+			BT_EVENT_FIELDS);
+	comm = bt_ctf_get_char_array(bt_ctf_get_field(call_data,
+				scope, "_comm"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing procname context info\n");
+		goto error;
+	}
+
+	tid = bt_ctf_get_int64(bt_ctf_get_field(call_data,
+				scope, "_tid"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing tid field\n");
+		goto error;
+	}
+
+	fprintf(stderr, "TERMINATED %ld\n", tid);
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+			" %s %" PRId64,
+			REDIS_SCHED_PROCESS_FREE,
+			ctx->traced_hostname, ctx->session_name, timestamp,
+			comm, tid);
+	if (!reply) {
+		freeReplyObject(reply);
+		goto error;
+	}
+	freeReplyObject(reply);
+
+	return BT_CB_OK;
+
+error:
+	return BT_CB_ERROR_STOP;
+
+}
