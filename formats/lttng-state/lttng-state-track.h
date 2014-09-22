@@ -35,5 +35,7 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 		void *private_data);
 enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 		void *private_data);
+enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
+		void *private_data);
 
 #endif /* LTTNG_STATE_TRACK_H */

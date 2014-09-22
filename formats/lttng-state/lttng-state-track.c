@@ -70,6 +70,9 @@ int lttng_state_init(struct lttng_state_ctx *ctx, struct bt_ctf_iter *iter)
 	bt_ctf_iter_add_callback(iter,
 			g_quark_from_static_string("sched_process_free"),
 			ctx, 0, handle_sched_process_free, NULL, NULL, NULL);
+	bt_ctf_iter_add_callback(iter,
+			g_quark_from_static_string("sched_switch"),
+			ctx, 0, handle_sched_switch, NULL, NULL, NULL);
 
 	if (!ctx->redis) {
 		ret = connect_redis(ctx);
@@ -77,7 +80,6 @@ int lttng_state_init(struct lttng_state_ctx *ctx, struct bt_ctf_iter *iter)
 			goto end;
 	}
 	ret = add_session(ctx);
-	ret = 0;
 
 end:
 	return ret;
