@@ -63,6 +63,8 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 	if (!reply) {
 		goto error;
 	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "sched_process_fork reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 	return BT_CB_OK;
@@ -109,9 +111,10 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			comm, tid);
 	if (!reply) {
-		freeReplyObject(reply);
 		goto error;
 	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "sched_process_free reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 	return BT_CB_OK;
@@ -193,6 +196,8 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 	if (!reply) {
 		goto error;
 	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "sched_switch reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 	return BT_CB_OK;
@@ -235,6 +240,8 @@ enum bt_cb_ret handle_sys_open(struct bt_ctf_event *call_data,
 	if (!reply) {
 		goto error;
 	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "sys_open reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 	return BT_CB_OK;
@@ -277,7 +284,7 @@ enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
 		goto error;
 	}
 	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "reply : %s\n", reply->str);
+		fprintf(stderr, "exit_syscall reply : %s\n", reply->str);
 	freeReplyObject(reply);
 
 
@@ -286,3 +293,47 @@ enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
 error:
 	return BT_CB_ERROR_STOP;
 }
+
+enum bt_cb_ret handle_sys_close(struct bt_ctf_event *call_data,
+		void *private_data)
+{
+	const struct bt_definition *scope;
+	unsigned long timestamp;
+	uint64_t cpu_id, fd;
+	redisReply *reply;
+	struct lttng_state_ctx *ctx = private_data;
+	redisContext *c = ctx->redis;
+	fprintf(stderr, "CLOSE\n");
+
+	timestamp = bt_ctf_get_timestamp(call_data);
+	if (timestamp == -1ULL)
+		goto error;
+
+	cpu_id = get_cpu_id(call_data);
+
+	scope = bt_ctf_get_top_level_scope(call_data,
+			BT_EVENT_FIELDS);
+	fd = bt_ctf_get_uint64(bt_ctf_get_field(call_data,
+				scope, "_fd"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing fd info\n");
+		goto error;
+	}
+
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+			" %" PRId64 " %" PRIu64,
+			REDIS_SYS_CLOSE, ctx->traced_hostname,
+			ctx->session_name, timestamp, cpu_id, fd);
+	if (!reply) {
+		goto error;
+	}
+	if (reply->type == REDIS_REPLY_STRING)
+		fprintf(stderr, "sys_close reply : %s\n", reply->str);
+	freeReplyObject(reply);
+
+	return BT_CB_OK;
+
+error:
+	return BT_CB_ERROR_STOP;
+}
+
