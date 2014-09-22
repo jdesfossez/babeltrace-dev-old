@@ -202,3 +202,46 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 error:
 	return BT_CB_ERROR_STOP;
 }
+
+enum bt_cb_ret handle_sys_open(struct bt_ctf_event *call_data,
+		void *private_data)
+{
+
+	const struct bt_definition *scope;
+	unsigned long timestamp;
+	uint64_t cpu_id;
+	char *filename;
+	redisReply *reply;
+	struct lttng_state_ctx *ctx = private_data;
+	redisContext *c = ctx->redis;
+
+	timestamp = bt_ctf_get_timestamp(call_data);
+	if (timestamp == -1ULL)
+		goto error;
+
+	cpu_id = get_cpu_id(call_data);
+
+	scope = bt_ctf_get_top_level_scope(call_data,
+			BT_EVENT_FIELDS);
+	filename = bt_ctf_get_string(bt_ctf_get_field(call_data,
+				scope, "_filename"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "Missing filename info\n");
+		goto error;
+	}
+
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+			" %" PRId64 " %s",
+			REDIS_SYS_OPEN, ctx->traced_hostname,
+			ctx->session_name, timestamp, cpu_id, filename);
+	if (!reply) {
+		freeReplyObject(reply);
+		goto error;
+	}
+	freeReplyObject(reply);
+
+	return BT_CB_OK;
+
+error:
+	return BT_CB_ERROR_STOP;
+}

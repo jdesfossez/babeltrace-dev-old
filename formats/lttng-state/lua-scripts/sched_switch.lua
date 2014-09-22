@@ -1,6 +1,6 @@
 -- REDIS_SCHED_SWITCH
 -- KEYS: hostname:session_name
--- ARGS: timestamp, prev_comm, prev_tid, next_comm, next_tid
+-- ARGS: timestamp, prev_comm, prev_tid, next_comm, next_tid, cpu_id
 
 local timestamp = ARGV[1]
 local prev_comm = ARGV[2]
