@@ -8,12 +8,29 @@
 #include "lttng-state-track.h"
 #include "lua_scripts.h"
 
+static
+uint64_t get_cpu_id(const struct bt_ctf_event *event)
+{
+	const struct bt_definition *scope;
+	uint64_t cpu_id;
+
+	scope = bt_ctf_get_top_level_scope(event, BT_STREAM_PACKET_CONTEXT);
+	cpu_id = bt_ctf_get_uint64(bt_ctf_get_field(event, scope, "cpu_id"));
+	if (bt_ctf_field_get_error()) {
+		fprintf(stderr, "[error] get cpu_id\n");
+		return -1ULL;
+	}
+
+	return cpu_id;
+}
+
+
 enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 		void *private_data)
 {
 	const struct bt_definition *scope;
 	int64_t child_tid, parent_pid, child_pid;
-	uint64_t timestamp;
+	uint64_t timestamp, cpu_id;
 	char *child_comm;
 	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
@@ -52,14 +69,16 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 		fprintf(stderr, "Missing parent_pid field\n");
 		goto error;
 	}
+	cpu_id = get_cpu_id(call_data);
+
 	fprintf(stderr, "TS: %lu, %ld %s %ld %ld\n", timestamp, parent_pid, child_comm,
 			child_tid, child_pid);
 
 	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRId64 \
-			" %s %" PRId64 " %" PRId64 " %" PRId64,
+			" %s %" PRId64 " %" PRId64 " %" PRId64 " %" PRIu64,
 			REDIS_SCHED_PROCESS_FORK,
 			ctx->traced_hostname, ctx->session_name, timestamp,
-			parent_pid, child_comm, child_tid, child_pid);
+			parent_pid, child_comm, child_tid, child_pid, cpu_id);
 	if (!reply) {
 		goto error;
 	}
@@ -80,6 +99,7 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 	uint64_t timestamp;
 	char *comm;
 	int64_t tid;
+	uint64_t cpu_id;
 	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
@@ -103,13 +123,14 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 		fprintf(stderr, "Missing tid field\n");
 		goto error;
 	}
+	cpu_id = get_cpu_id(call_data);
 
 	fprintf(stderr, "TERMINATED %ld\n", tid);
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRIu64 \
 			" %s %" PRId64,
 			REDIS_SCHED_PROCESS_FREE,
 			ctx->traced_hostname, ctx->session_name, timestamp,
-			comm, tid);
+			cpu_id, comm, tid);
 	if (!reply) {
 		goto error;
 	}
@@ -122,22 +143,6 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 error:
 	return BT_CB_ERROR_STOP;
 
-}
-
-static
-uint64_t get_cpu_id(const struct bt_ctf_event *event)
-{
-	const struct bt_definition *scope;
-	uint64_t cpu_id;
-
-	scope = bt_ctf_get_top_level_scope(event, BT_STREAM_PACKET_CONTEXT);
-	cpu_id = bt_ctf_get_uint64(bt_ctf_get_field(event, scope, "cpu_id"));
-	if (bt_ctf_field_get_error()) {
-		fprintf(stderr, "[error] get cpu_id\n");
-		return -1ULL;
-	}
-
-	return cpu_id;
 }
 
 enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
@@ -303,7 +308,6 @@ enum bt_cb_ret handle_sys_close(struct bt_ctf_event *call_data,
 	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
-	fprintf(stderr, "CLOSE\n");
 
 	timestamp = bt_ctf_get_timestamp(call_data);
 	if (timestamp == -1ULL)
