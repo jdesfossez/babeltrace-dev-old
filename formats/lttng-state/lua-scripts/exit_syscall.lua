@@ -117,10 +117,14 @@ if func_ret == 1 then
 	return 0
 end
 
+redis.call("SET", KEYS[1]..":events:"..event..":completed", timestamp..":"..cpu_id)
+local enter_event = event
+
 event = timestamp..":cpu"..cpu_id
 redis.call("RPUSH", KEYS[1]..":events", event)
 redis.call("SET", KEYS[1]..":events:"..event..":event_name", "exit_syscall")
 redis.call("SET", KEYS[1]..":events:"..event..":ret", ret)
 redis.call("SET", KEYS[1]..":events:"..event..":tid", t)
+redis.call("SET", KEYS[1]..":events:"..event..":enter_event", enter_event)
 
 return 0

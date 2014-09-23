@@ -9,6 +9,9 @@ def ns_to_hour_nsec(ns):
     d = time.localtime(ns/NSEC_PER_SEC)
     return "%02d:%02d:%02d.%09d" % (d.tm_hour, d.tm_min, d.tm_sec, ns % NSEC_PER_SEC)
 
+def ns_to_sec(ns):
+    return "%lu.%09u" % (ns/NSEC_PER_SEC, ns % NSEC_PER_SEC)
+
 def run():
     r = redis.Redis("localhost")
 
@@ -25,30 +28,54 @@ def run():
         payload = ""
         if name == "sys_open":
             path = r.get(root_key + ":events:" + e + ":path")
-            payload = "filename = \"%s\", flags = ?, mode = ?" % (path)
+            completed = r.get(root_key + ":events:" + e + ":completed")
+            completed = completed.split(":")[0]
+            delta = ns_to_sec(int(completed) - ts)
+            payload = "filename = \"%s\", flags = ?, mode = ?, latency = %ss" % (path, delta)
         elif name == "sys_close":
             fd = r.get(root_key + ":events:" + e + ":fd")
-            payload = "fd = %s" % fd
+            completed = r.get(root_key + ":events:" + e + ":completed")
+            completed = completed.split(":")[0]
+            delta = ns_to_sec(int(completed) - ts)
+            payload = "fd = %s, latency = %ss" % (fd, delta)
         elif name == "exit_syscall":
             ret = r.get(root_key + ":events:" + e + ":ret")
-            payload = "ret = %s" % ret
+            enter_event = r.get(root_key + ":events:" + e + ":enter_event")
+            enter_ts = enter_event.split(":")[0]
+            delta = ns_to_sec(ts - int(enter_ts))
+            oldname = r.get(root_key + ":events:" + enter_event + ":event_name")
+            payload = "ret = %s, event = \"%s\", latency = %ss" % (ret, oldname, delta)
         elif name == "sched_process_free":
             comm = r.get(root_key + ":events:" + e + ":comm")
             tid = r.get(root_key + ":events:" + e + ":tid")
             payload = "comm = \"%s\", tid = %s, prio = ? " % (comm, tid)
-        # FIXME fork :  parent_pid, child_comm, child_tid, child_pid
+        elif name == "sched_process_fork":
+            parent_pid = r.get(root_key + ":events:" + e + ":parent_pid")
+            child_comm = r.get(root_key + ":events:" + e + ":child_comm")
+            child_tid = r.get(root_key + ":events:" + e + ":child_tid")
+            child_pid = r.get(root_key + ":events:" + e + ":child_pid")
+            payload = "parent_comm = \"?\", parent_tid = ?, parent_pid = %s, child_comm = \"%s\", child_tid = %s, child_pid = %s" % \
+                    (parent_pid, child_comm, child_tid, child_pid)
 
         tid = r.get(root_key + ":events:" + e + ":tid")
+        otid = tid
+        pid = "?"
         if tid:
             procname = r.get(root_key + ":tids:" + tid + ":procname")
+            if not procname:
+                procname = "?"
             tid = tid.split(":")[0]
+            pid = r.get(root_key + ":tids:" + otid + ":pid")
+            if not pid:
+                pid = "?"
+            else:
+                pid = pid.split(":")[0]
         else:
             procname = "?"
             tid = "?"
 
-
         print("[%s] %s %s: { cpu_id = %s }, { tid = %s, procname = \"%s\", pid = %s }, { %s }" %
-                (ns_to_hour_nsec(ts), hostname, name, cpu_id, tid, procname, "?",
+                (ns_to_hour_nsec(ts), hostname, name, cpu_id, tid, procname, pid,
                     payload))
 
 if __name__ == "__main__":

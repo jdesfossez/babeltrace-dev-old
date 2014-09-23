@@ -23,6 +23,7 @@ if child_tid == child_pid then
 end
 
 local s1 = redis.call("LINDEX", KEYS[1]..":pids:"..child_pid, -1)
+s1 = tostring(s1)
 
 redis.call("SADD", KEYS[1]..":tids", child_tid)
 local s = redis.call("LINDEX", KEYS[1]..":tids:"..child_pid, -1)
@@ -39,7 +40,7 @@ redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..s..":created", timestamp)
 
 local event = timestamp..":cpu"..cpu_id
 redis.call("RPUSH", KEYS[1]..":events", event)
-redis.call("SET", KEYS[1]..":events:"..event..":parent_tid", parent_tid)
+redis.call("SET", KEYS[1]..":events:"..event..":parent_pid", parent_pid)
 redis.call("SET", KEYS[1]..":events:"..event..":child_comm", child_comm)
 redis.call("SET", KEYS[1]..":events:"..event..":child_tid", child_tid)
 redis.call("SET", KEYS[1]..":events:"..event..":child_pid", child_pid)
