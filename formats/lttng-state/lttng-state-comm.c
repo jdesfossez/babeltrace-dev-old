@@ -1587,6 +1587,7 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 	struct bt_format *fmt_write;
 	struct ctf_text_stream_pos *sout;
 	uint64_t id;
+	void *reply;
 
 	ctx->bt_ctx = bt_context_create();
 	if (!ctx->bt_ctx) {
@@ -1697,16 +1698,11 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 							"event failed.\n");
 					goto end_free;
 				}
-				if (nb_events > 10000) {
-					void *reply;
-					printf("FLUSH\n");
-
-					for (int j = 0; j < nb_events; j++) {
+				/* periodical flush of the redis pipeline. */
+				if (nb_events > 100000) {
+					for (int j = 0; j < nb_events; j++)
 						redisGetReply(ctx->redis, &reply);
-					}
 					nb_events = 0;
-					printf("FLUSH DONE\n");
-
 				}
 			}
 			ret = bt_iter_next(bt_ctf_get_iter(iter));
@@ -1721,8 +1717,11 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 	}
 
 end_free:
-	bt_context_put(ctx->bt_ctx);
 end:
+	bt_context_put(ctx->bt_ctx);
+	/* Flush the last events */
+	for (int j = 0; j < nb_events; j++)
+		redisGetReply(ctx->redis, &reply);
 	if (lttng_state_should_quit()) {
 		ret = 0;
 	}
