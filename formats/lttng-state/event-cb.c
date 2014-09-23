@@ -32,7 +32,6 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 	int64_t child_tid, parent_pid, child_pid;
 	uint64_t timestamp, cpu_id;
 	char *child_comm;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -74,17 +73,12 @@ enum bt_cb_ret handle_sched_process_fork(struct bt_ctf_event *call_data,
 	fprintf(stderr, "TS: %lu, %ld %s %ld %ld\n", timestamp, parent_pid, child_comm,
 			child_tid, child_pid);
 
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRId64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRId64 \
 			" %s %" PRId64 " %" PRId64 " %" PRId64 " %" PRIu64,
 			REDIS_SCHED_PROCESS_FORK,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			parent_pid, child_comm, child_tid, child_pid, cpu_id);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "sched_process_fork reply : %s\n", reply->str);
-	freeReplyObject(reply);
+	nb_events++;
 
 	return BT_CB_OK;
 
@@ -100,7 +94,6 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 	char *comm;
 	int64_t tid;
 	uint64_t cpu_id;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -126,17 +119,12 @@ enum bt_cb_ret handle_sched_process_free(struct bt_ctf_event *call_data,
 	cpu_id = get_cpu_id(call_data);
 
 	fprintf(stderr, "TERMINATED %ld\n", tid);
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRIu64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 " %" PRIu64 \
 			" %s %" PRId64,
 			REDIS_SCHED_PROCESS_FREE,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			cpu_id, comm, tid);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "sched_process_free reply : %s\n", reply->str);
-	freeReplyObject(reply);
+	nb_events++;
 
 	return BT_CB_OK;
 
@@ -153,7 +141,6 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 	uint64_t cpu_id;
 	char *prev_comm, *next_comm;
 	int64_t prev_tid, next_tid;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -193,17 +180,12 @@ enum bt_cb_ret handle_sched_switch(struct bt_ctf_event *call_data,
 
 	cpu_id = get_cpu_id(call_data);
 
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
 			" %s %" PRId64 " %s %" PRId64 " %" PRIu64,
 			REDIS_SCHED_SWITCH,
 			ctx->traced_hostname, ctx->session_name, timestamp,
 			prev_comm, prev_tid, next_comm, next_tid, cpu_id);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "sched_switch reply : %s\n", reply->str);
-	freeReplyObject(reply);
+	nb_events++;
 
 	return BT_CB_OK;
 
@@ -219,7 +201,6 @@ enum bt_cb_ret handle_sys_open(struct bt_ctf_event *call_data,
 	unsigned long timestamp;
 	uint64_t cpu_id;
 	char *filename;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -238,16 +219,11 @@ enum bt_cb_ret handle_sys_open(struct bt_ctf_event *call_data,
 		goto error;
 	}
 
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
 			" %" PRId64 " %s",
 			REDIS_SYS_OPEN, ctx->traced_hostname,
 			ctx->session_name, timestamp, cpu_id, filename);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "sys_open reply : %s\n", reply->str);
-	freeReplyObject(reply);
+	nb_events++;
 
 	return BT_CB_OK;
 
@@ -262,7 +238,6 @@ enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
 	unsigned long timestamp;
 	int64_t ret;
 	uint64_t cpu_id;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -281,17 +256,11 @@ enum bt_cb_ret handle_exit_syscall(struct bt_ctf_event *call_data,
 
 	cpu_id = get_cpu_id(call_data);
 
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
 			" %" PRId64 " %" PRId64,
 			REDIS_EXIT_SYSCALL, ctx->traced_hostname,
 			ctx->session_name, timestamp, cpu_id, ret);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "exit_syscall reply : %s\n", reply->str);
-	freeReplyObject(reply);
-
+	nb_events++;
 
 	return BT_CB_OK;
 
@@ -305,7 +274,6 @@ enum bt_cb_ret handle_sys_close(struct bt_ctf_event *call_data,
 	const struct bt_definition *scope;
 	unsigned long timestamp;
 	uint64_t cpu_id, fd;
-	redisReply *reply;
 	struct lttng_state_ctx *ctx = private_data;
 	redisContext *c = ctx->redis;
 
@@ -324,16 +292,11 @@ enum bt_cb_ret handle_sys_close(struct bt_ctf_event *call_data,
 		goto error;
 	}
 
-	reply = redisCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
+	redisAppendCommand(c, "EVALSHA %s 1 %s:%s %" PRId64 \
 			" %" PRId64 " %" PRIu64,
 			REDIS_SYS_CLOSE, ctx->traced_hostname,
 			ctx->session_name, timestamp, cpu_id, fd);
-	if (!reply) {
-		goto error;
-	}
-	if (reply->type == REDIS_REPLY_STRING)
-		fprintf(stderr, "sys_close reply : %s\n", reply->str);
-	freeReplyObject(reply);
+	nb_events++;
 
 	return BT_CB_OK;
 

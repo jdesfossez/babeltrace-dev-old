@@ -1635,6 +1635,7 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 	 */
 	for (;;) {
 		int flags;
+		nb_events = 0;
 
 		if (lttng_state_should_quit()) {
 			ret = 0;
@@ -1695,6 +1696,17 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 					fprintf(stderr, "[error] Writing "
 							"event failed.\n");
 					goto end_free;
+				}
+				if (nb_events > 10000) {
+					void *reply;
+					printf("FLUSH\n");
+
+					for (int j = 0; j < nb_events; j++) {
+						redisGetReply(ctx->redis, &reply);
+					}
+					nb_events = 0;
+					printf("FLUSH DONE\n");
+
 				}
 			}
 			ret = bt_iter_next(bt_ctf_get_iter(iter));
