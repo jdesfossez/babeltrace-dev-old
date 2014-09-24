@@ -28,17 +28,20 @@ def run():
         payload = ""
         if name == "sys_open":
             path = r.get(root_key + ":events:" + e + ":path")
-            completed = r.get(root_key + ":events:" + e + ":completed")
-            completed = completed.split(":")[0]
+            rcompleted = r.get(root_key + ":events:" + e + ":completed")
+            completed = rcompleted.split(":")[0]
             delta = ns_to_sec(int(completed) - ts)
-            payload = "filename = \"%s\", flags = ?, mode = ?, latency = %ss" % (path, delta)
+            revent = rcompleted.split(":")[0] + ":cpu" + rcompleted.split(":")[1]
+            result_fd = r.get(root_key + ":events:" + revent + ":ret")
+            payload = "filename = \"%s\", flags = ?, mode = ?, ret = { duration = %ss, fd = %s }" % (path, delta, result_fd)
         elif name == "sys_close":
             fd = r.get(root_key + ":events:" + e + ":fd")
             completed = r.get(root_key + ":events:" + e + ":completed")
             completed = completed.split(":")[0]
             delta = ns_to_sec(int(completed) - ts)
-            payload = "fd = %s, latency = %ss" % (fd, delta)
+            payload = "fd = %s, ret = { duration = %ss }" % (fd, delta)
         elif name == "exit_syscall":
+            continue
             ret = r.get(root_key + ":events:" + e + ":ret")
             enter_event = r.get(root_key + ":events:" + e + ":enter_event")
             enter_ts = enter_event.split(":")[0]
