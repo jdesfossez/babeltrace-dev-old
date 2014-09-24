@@ -31,8 +31,7 @@ def run():
             rcompleted = r.get(root_key + ":events:" + e + ":completed")
             completed = rcompleted.split(":")[0]
             delta = ns_to_sec(int(completed) - ts)
-            revent = rcompleted.split(":")[0] + ":cpu" + rcompleted.split(":")[1]
-            result_fd = r.get(root_key + ":events:" + revent + ":ret")
+            result_fd = r.get(root_key + ":events:" + rcompleted + ":ret")
             payload = "filename = \"%s\", flags = ?, mode = ?, ret = { duration = %ss, fd = %s }" % (path, delta, result_fd)
         elif name == "sys_close":
             fd = r.get(root_key + ":events:" + e + ":fd")

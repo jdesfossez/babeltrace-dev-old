@@ -117,7 +117,7 @@ if func_ret == 1 then
 	return 0
 end
 
-redis.call("SET", KEYS[1]..":events:"..event..":completed", timestamp..":"..cpu_id)
+redis.call("SET", KEYS[1]..":events:"..event..":completed", timestamp..":cpu"..cpu_id)
 local enter_event = event
 
 event = timestamp..":cpu"..cpu_id
