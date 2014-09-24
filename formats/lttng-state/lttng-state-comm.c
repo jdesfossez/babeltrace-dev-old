@@ -1631,12 +1631,12 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 		}
 	}
 
+	nb_events = 0;
 	/*
 	 * As long as the session is active, we try to get new streams.
 	 */
 	for (;;) {
 		int flags;
-		nb_events = 0;
 
 		if (lttng_state_should_quit()) {
 			ret = 0;
@@ -1699,7 +1699,8 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 					goto end_free;
 				}
 				/* periodical flush of the redis pipeline. */
-				if (nb_events > 100000) {
+				if (nb_events > 10000) {
+					fprintf(stderr, "Flushing %d events to redis\n", nb_events);
 					for (int j = 0; j < nb_events; j++)
 						redisGetReply(ctx->redis, &reply);
 					nb_events = 0;
@@ -1720,6 +1721,7 @@ end_free:
 end:
 	bt_context_put(ctx->bt_ctx);
 	/* Flush the last events */
+	fprintf(stderr, "Flushing %d events to redis\n", nb_events);
 	for (int j = 0; j < nb_events; j++)
 		redisGetReply(ctx->redis, &reply);
 	if (lttng_state_should_quit()) {
