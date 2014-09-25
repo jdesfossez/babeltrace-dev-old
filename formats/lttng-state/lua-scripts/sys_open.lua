@@ -21,4 +21,7 @@ redis.call("SET", KEYS[1]..":events:"..event..":tid", t)
 local last_sched = redis.call("GET", KEYS[1]..":cpus:"..cpu_id..":last_sched_ts")
 redis.call("SET", KEYS[1]..":events:"..event..":sched_in", last_sched)
 
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "event_name", "path", "tid",
+	"last_sched_ts", "sched_in")
+
 return 0

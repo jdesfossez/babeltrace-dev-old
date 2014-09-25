@@ -19,4 +19,6 @@ redis.call("SET", KEYS[1]..":events:"..event..":event_name", "sys_close")
 redis.call("SET", KEYS[1]..":events:"..event..":fd", fd)
 redis.call("SET", KEYS[1]..":events:"..event..":tid", t)
 
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "event_name", "fd", "tid")
+
 return 0

@@ -1701,8 +1701,12 @@ int lttng_state_read(struct lttng_state_ctx *ctx)
 				/* periodical flush of the redis pipeline. */
 				if (nb_events > 10000) {
 					fprintf(stderr, "Flushing %d events to redis\n", nb_events);
-					for (int j = 0; j < nb_events; j++)
+					for (int j = 0; j < nb_events; j++) {
 						redisGetReply(ctx->redis, &reply);
+						if (ctx->redis->err)
+							printf("redis error : %s\n", ctx->redis->errstr);
+						freeReplyObject(reply);
+					}
 					nb_events = 0;
 				}
 			}
@@ -1722,8 +1726,12 @@ end:
 	bt_context_put(ctx->bt_ctx);
 	/* Flush the last events */
 	fprintf(stderr, "Flushing %d events to redis\n", nb_events);
-	for (int j = 0; j < nb_events; j++)
+	for (int j = 0; j < nb_events; j++) {
 		redisGetReply(ctx->redis, &reply);
+		if (ctx->redis->err)
+			printf("redis error : %s\n", ctx->redis->errstr);
+		freeReplyObject(reply);
+	}
 	if (lttng_state_should_quit()) {
 		ret = 0;
 	}

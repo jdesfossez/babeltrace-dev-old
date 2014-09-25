@@ -17,6 +17,7 @@ function do_sys_open(t, ret, event, timestamp, cpu_id)
 		redis.call("DEL", KEYS[1]..":events:"..event..":path")
 		redis.call("DEL", KEYS[1]..":events:"..event..":sched_in")
 		redis.call("DEL", KEYS[1]..":events:"..event.."tid")
+		redis.call("DEL", KEYS[1]..":events:"..event.."attrs")
 		return 1
 	end
 	local pid = redis.call("GET", KEYS[1]..":tids:"..t..":pid")
@@ -36,6 +37,9 @@ function do_sys_open(t, ret, event, timestamp, cpu_id)
 		fd_index = fd_index + 1
 	end
 	redis.call("RPUSH", base_key..":fds:"..ret, fd_index)
+
+	redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "subfd")
+	redis.call("SET", KEYS[1]..":events:"..event..":subfd", fd_index)
 
 	base_key = base_key..":fds:"..ret..":"..fd_index
 	redis.call("SADD", base_key..":ops", timestamp..":"..cpu_id)
@@ -57,6 +61,7 @@ function do_sys_close(t, ret, event, timestamp, cpu_id)
 		redis.call("DEL", KEYS[1]..":events:"..event..":path")
 		redis.call("DEL", KEYS[1]..":events:"..event..":sched_in")
 		redis.call("DEL", KEYS[1]..":events:"..event.."tid")
+		redis.call("DEL", KEYS[1]..":events:"..event.."attrs")
 		return 1
 	end
 	local pid = redis.call("GET", KEYS[1]..":tids:"..t..":pid")
@@ -76,8 +81,11 @@ function do_sys_close(t, ret, event, timestamp, cpu_id)
 		redis.call("DEL", KEYS[1]..":events:"..event..":path")
 		redis.call("DEL", KEYS[1]..":events:"..event..":sched_in")
 		redis.call("DEL", KEYS[1]..":events:"..event.."tid")
+		redis.call("DEL", KEYS[1]..":events:"..event.."attrs")
 		return 1
 	end
+	redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "subfd")
+	redis.call("SET", KEYS[1]..":events:"..event..":subfd", fd_index)
 
 	base_key = base_key..":fds:"..fd..":"..fd_index
 	redis.call("SADD", base_key..":ops", timestamp..":"..cpu_id)
