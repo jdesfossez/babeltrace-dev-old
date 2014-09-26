@@ -16,7 +16,8 @@ if not s then
 	redis.call("SADD", KEYS[1]..":tids", next_tid)
 	redis.call("RPUSH", KEYS[1]..":tids:"..next_tid, s)
 	redis.call("SET", KEYS[1]..":tids:"..next_tid..":"..s..":procname", next_comm)
-	redis.call("SET", KEYS[1]..":tids:"..next_tid..":"..s..":created", timestamp)
+	redis.call("SET", KEYS[1]..":tids:"..next_tid..":"..s..":created",
+		timestamp..":"..cpu_id)
 end
 
 redis.call("SET", KEYS[1]..":cpus:"..cpu_id..":current_tid", next_tid..":"..s)

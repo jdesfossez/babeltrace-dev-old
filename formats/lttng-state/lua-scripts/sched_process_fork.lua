@@ -36,7 +36,8 @@ end
 redis.call("RPUSH", KEYS[1]..":tids:"..child_tid, s)
 redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..s..":pid", child_pid..":"..s1)
 redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..s..":procname", child_comm)
-redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..s..":created", timestamp)
+redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..s..":created",
+	timestamp..":"..cpu_id)
 
 local event = timestamp..":cpu"..cpu_id
 redis.call("RPUSH", KEYS[1]..":events", event)

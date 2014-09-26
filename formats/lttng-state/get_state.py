@@ -29,6 +29,8 @@ def run():
         if name == "sys_open":
             path = r.get(root_key + ":events:" + e + ":path")
             rcompleted = r.get(root_key + ":events:" + e + ":completed")
+            if not rcompleted:
+                continue
             completed = rcompleted.split(":")[0]
             delta = ns_to_sec(int(completed) - ts)
             result_fd = r.get(root_key + ":events:" + rcompleted + ":ret")

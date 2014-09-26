@@ -43,12 +43,14 @@ function do_sys_open(t, ret, event, timestamp, cpu_id)
 
 	base_key = base_key..":fds:"..ret..":"..fd_index
 	redis.call("SADD", base_key..":ops", timestamp..":"..cpu_id)
-	redis.call("SET", base_key..":created", timestamp..":"..cpu_id)
+	redis.call("SET", base_key..":created", timestamp..":cpu"..cpu_id)
 	local path = redis.call("GET", KEYS[1]..":events:"..event..":path")
 	redis.call("SET", base_key..":path", path)
+	redis.call("SADD", base_key..":attrs", "ops", "created", "path")
 
 	local last_sched = redis.call("GET", KEYS[1]..":cpus:"..cpu_id..":last_sched_ts")
 	redis.call("SET", KEYS[1]..":events:"..event..":sched_out", last_sched)
+	redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "sched_out")
 
 	return 0
 end
@@ -90,10 +92,12 @@ function do_sys_close(t, ret, event, timestamp, cpu_id)
 	base_key = base_key..":fds:"..fd..":"..fd_index
 	redis.call("SADD", base_key..":ops", timestamp..":"..cpu_id)
 	redis.call("SET", base_key..":closed", timestamp..":"..cpu_id)
+	redis.call("SADD", base_key..":attrs", "closed")
 	--redis.log(redis.LOG_WARNING,"close4XXX "..ret)
 
 	local last_sched = redis.call("GET", KEYS[1]..":cpus:"..cpu_id..":last_sched_ts")
 	redis.call("SET", KEYS[1]..":events:"..event..":sched_out", last_sched)
+	redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "sched_out")
 
 	return 0
 end
@@ -126,6 +130,7 @@ if func_ret == 1 then
 end
 
 redis.call("SET", KEYS[1]..":events:"..event..":completed", timestamp..":cpu"..cpu_id)
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "completed")
 local enter_event = event
 
 event = timestamp..":cpu"..cpu_id
@@ -134,5 +139,7 @@ redis.call("SET", KEYS[1]..":events:"..event..":event_name", "exit_syscall")
 redis.call("SET", KEYS[1]..":events:"..event..":ret", ret)
 redis.call("SET", KEYS[1]..":events:"..event..":tid", t)
 redis.call("SET", KEYS[1]..":events:"..event..":enter_event", enter_event)
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "event_name", "ret",
+	"tid", "enter_event")
 
 return 0
