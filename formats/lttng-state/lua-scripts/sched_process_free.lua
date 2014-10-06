@@ -18,9 +18,9 @@ redis.call("SET", KEYS[1]..":tids:"..t..":terminated", timestamp)
 local event = timestamp..":cpu"..cpu_id
 redis.call("RPUSH", KEYS[1]..":events", event)
 redis.call("SET", KEYS[1]..":events:"..event..":comm", comm)
-redis.call("SET", KEYS[1]..":events:"..event..":tid", t)
+redis.call("SET", KEYS[1]..":events:"..event..":free_tid", t)
 redis.call("SET", KEYS[1]..":events:"..event..":event_name", "sched_process_free")
 
-redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "comm", "tid", "event_name")
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "comm", "free_tid", "event_name")
 
 return 0

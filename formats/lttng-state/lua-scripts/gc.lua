@@ -117,23 +117,27 @@ function clear_pid(cpid, pid)
 end
 
 function handle_process_free(event)
-	local tid = redis.call("GET", KEYS[1]..":events:"..event..":tid")
+	local tid = redis.call("GET", KEYS[1]..":events:"..event..":free_tid")
 	local tid_key =  KEYS[1]..":tids:"..tid
 	local ctid, subtid
 	ctid, subtid = tid:match("([^,]+):([^,]+)")
 
 	local fork_event = redis.call("GET", tid_key..":created")
 	local pid = redis.call("GET", tid_key..":pid")
-	local cpid, subpid
-	cpid, subpid = pid:match("([^,]+):([^,]+)")
+	if not pid then
+		clear_all_fds(tid_key)
+	else
+		local cpid, subpid
+		cpid, subpid = pid:match("([^,]+):([^,]+)")
 
-	-- if it is the main thread, clear all the threads and fds
-	if cpid == ctid then
-		clear_pid(cpid, pid)
-		redis.call("LREM", KEYS[1]..":pids:"..cpid, 1, subpid)
-		local exists = redis.call("GET", KEYS[1]..":pids:"..ctid)
-		if not exists then
-			redis.call("SREM", KEYS[1]..":pids", cpid)
+		-- if it is the main thread, clear all the threads and fds
+		if cpid == ctid then
+			clear_pid(cpid, pid)
+			redis.call("LREM", KEYS[1]..":pids:"..cpid, 1, subpid)
+			local exists = redis.call("GET", KEYS[1]..":pids:"..ctid)
+			if not exists then
+				redis.call("SREM", KEYS[1]..":pids", cpid)
+			end
 		end
 	end
 

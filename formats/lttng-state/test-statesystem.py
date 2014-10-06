@@ -46,5 +46,7 @@ def run():
 
     r.evalsha(REDIS_SCHED_PROCESS_FREE, 1, s, 8000000000, 1, "new_child", 99)
 
+    #r.evalsha(REDIS_SCHED_SWITCH, 1, s, 1000000001, "new_child", 99, "unknown_thread", 42, 0)
+
 if __name__ == "__main__":
     run()
