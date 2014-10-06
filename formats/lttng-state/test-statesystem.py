@@ -44,9 +44,12 @@ def run():
     r.evalsha(REDIS_SYS_CLOSE, 1, s, 4000000000, 0, 4)
     r.evalsha(REDIS_EXIT_SYSCALL, 1, s, 4000000001, 0, 0)
 
-    r.evalsha(REDIS_SCHED_PROCESS_FREE, 1, s, 8000000000, 1, "new_child", 99)
+    r.evalsha(REDIS_SCHED_PROCESS_FREE, 1, s, 8000000000, 0, "new_child", 99)
 
-    #r.evalsha(REDIS_SCHED_SWITCH, 1, s, 1000000001, "new_child", 99, "unknown_thread", 42, 0)
+    r.evalsha(REDIS_SCHED_SWITCH, 1, s, 10000000000, "new_child", 99, "unknown_thread", 42, 0)
+    r.evalsha(REDIS_SYS_OPEN, 1, s, 10000000001, 0, "/tmp/bla42")
+    r.evalsha(REDIS_EXIT_SYSCALL, 1, s, 10000000002, 0, 3)
+    r.evalsha(REDIS_SCHED_PROCESS_FREE, 1, s, 10000000003, 0, "unknown_thread", 42)
 
 if __name__ == "__main__":
     run()
