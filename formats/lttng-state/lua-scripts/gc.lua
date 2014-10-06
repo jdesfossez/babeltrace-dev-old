@@ -60,8 +60,9 @@ function gc(timestamp)
 	for i,j in pairs(events) do
 		local oldts, oldcpu
 		oldts, oldcpu = j:match("([^,]+):([^,]+)")
+		redis.log(redis.LOG_WARNING, "gc "..oldts..", "..timestamp)
 		if timestamp - oldts < max_history then
-			return 0
+			return 2
 		end
 		local event_name = redis.call("GET",
 			KEYS[1]..":events:"..j..":event_name")
