@@ -29,7 +29,7 @@ if child_tid == child_pid then
 		child_tid..":"..subtid)
 	redis.call("SET", KEYS[1]..":pids:"..child_tid..":"..s..":procname", child_comm)
 	redis.call("SET", KEYS[1]..":pids:"..child_tid..":"..s..":created",
-	timestamp..":"..cpu_id)
+	timestamp..":cpu"..cpu_id)
 end
 
 local s1 = redis.call("LINDEX", KEYS[1]..":pids:"..child_pid, -1)
@@ -41,7 +41,7 @@ redis.call("RPUSH", KEYS[1]..":tids:"..child_tid, subtid)
 redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..subtid..":pid", child_pid..":"..s1)
 redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..subtid..":procname", child_comm)
 redis.call("SET", KEYS[1]..":tids:"..child_tid..":"..subtid..":created",
-	timestamp..":"..cpu_id)
+	timestamp..":cpu"..cpu_id)
 
 local event = timestamp..":cpu"..cpu_id
 redis.call("RPUSH", KEYS[1]..":events", event)
@@ -50,5 +50,8 @@ redis.call("SET", KEYS[1]..":events:"..event..":child_comm", child_comm)
 redis.call("SET", KEYS[1]..":events:"..event..":child_tid", child_tid)
 redis.call("SET", KEYS[1]..":events:"..event..":child_pid", child_pid)
 redis.call("SET", KEYS[1]..":events:"..event..":event_name", "sched_process_fork")
+
+redis.call("SADD", KEYS[1]..":events:"..event..":attrs", "parent_pid", "child_comm",
+	"child_tid", "child_pid", "event_name")
 
 return 0
