@@ -115,7 +115,9 @@ static GQuark Q_STREAM_PACKET_CONTEXT_TIMESTAMP_BEGIN,
 	Q_STREAM_PACKET_CONTEXT_TIMESTAMP_END,
 	Q_STREAM_PACKET_CONTEXT_EVENTS_DISCARDED,
 	Q_STREAM_PACKET_CONTEXT_CONTENT_SIZE,
-	Q_STREAM_PACKET_CONTEXT_PACKET_SIZE;
+	Q_STREAM_PACKET_CONTEXT_PACKET_SIZE,
+	Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM,
+	Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM_PADDING;
 
 static
 void __attribute__((constructor)) init_quarks(void)
@@ -125,6 +127,8 @@ void __attribute__((constructor)) init_quarks(void)
 	Q_STREAM_PACKET_CONTEXT_EVENTS_DISCARDED = g_quark_from_static_string("stream.packet.context.events_discarded");
 	Q_STREAM_PACKET_CONTEXT_CONTENT_SIZE = g_quark_from_static_string("stream.packet.context.content_size");
 	Q_STREAM_PACKET_CONTEXT_PACKET_SIZE = g_quark_from_static_string("stream.packet.context.packet_size");
+	Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM = g_quark_from_static_string("stream.packet.context.packet_seq_num");
+	Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM_PADDING = g_quark_from_static_string("stream.packet.context.packet_seq_num_padding");
 }
 
 static
@@ -151,6 +155,10 @@ int print_field(struct bt_definition *definition)
 	if (definition->path == Q_STREAM_PACKET_CONTEXT_CONTENT_SIZE)
 		return 0;
 	if (definition->path == Q_STREAM_PACKET_CONTEXT_PACKET_SIZE)
+		return 0;
+	if (definition->path == Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM)
+		return 0;
+	if (definition->path == Q_STREAM_PACKET_CONTEXT_PACKET_SEQ_NUM_PADDING)
 		return 0;
 
 	return 1;
