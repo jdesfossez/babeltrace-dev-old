@@ -23,12 +23,17 @@ test_ctf_writer_LDADD = $(LIBTAP) \
 test_bt_values_LDADD = $(LIBTAP) \
 	$(top_builddir)/lib/libbabeltrace.la
 
-noinst_PROGRAMS = test_seek test_bitfield test_ctf_writer test_bt_values
+test_intersect_LDADD = $(LIBTAP) \
+	$(top_builddir)/lib/libbabeltrace.la \
+	$(top_builddir)/formats/ctf/libbabeltrace-ctf.la
+
+noinst_PROGRAMS = test_seek test_bitfield test_ctf_writer test_bt_values test_intersect
 
 test_seek_SOURCES = test_seek.c
 test_bitfield_SOURCES = test_bitfield.c
 test_ctf_writer_SOURCES = test_ctf_writer.c
 test_bt_values_SOURCES = test_bt_values.c
+test_intersect_SOURCES = testintersect.c
 
 SCRIPT_LIST = test_seek_big_trace \
 	test_seek_empty_packet \
