@@ -45,13 +45,13 @@
 #include <math.h>
 #include <float.h>
 
-static struct bt_ctf_field_type *uint_32_type;
+static struct bt_ctf_field_type *uint_32_type, *uint_64_type;
 static struct bt_ctf_field *integer_field, *stream_field, *begin_field, *end_field;
 static struct bt_ctf_event *simple_event;
 static struct bt_ctf_clock *btclock;
 
 void create_packet(struct bt_ctf_stream *stream, int value, uint64_t begin,
-		uint64_t end, uint64_t ts)
+		uint64_t end, uint64_t ts, uint64_t seq_num)
 {
 	struct bt_ctf_field *packet_context;
 	struct bt_ctf_field *packet_context_field;
@@ -91,6 +91,14 @@ void create_packet(struct bt_ctf_stream *stream, int value, uint64_t begin,
 	ok(bt_ctf_field_unsigned_integer_set_value(packet_context_field, end) == 0,
 		"Custom packet context field value successfully set.");
 	bt_put(packet_context_field);
+
+
+	packet_context = bt_ctf_stream_get_packet_context(stream);
+	packet_context_field = bt_ctf_field_structure_get_field(packet_context,
+		"packet_seq_num");
+	bt_ctf_field_unsigned_integer_set_value(packet_context_field, seq_num);
+
+
 	ok(bt_ctf_clock_set_time(btclock, ts) == 0, "clock");
 
 	ok(bt_ctf_stream_append_event(stream, simple_event) == 0,
@@ -114,7 +122,8 @@ int main(int argc, char **argv)
 	char hostname[BABELTRACE_HOST_NAME_MAX];
 	struct bt_ctf_stream_class *stream_class;
 	struct bt_ctf_stream *stream1, *stream2;
-	struct bt_ctf_field_type *packet_header_type;
+	struct bt_ctf_field_type *packet_header_type, *packet_context_type;
+
 	struct bt_ctf_trace *trace;
 	int ret;
 	struct bt_ctf_event_class *simple_event_class =
@@ -161,6 +170,18 @@ int main(int argc, char **argv)
 	packet_header_type = bt_ctf_trace_get_packet_header_type(trace);
 	ok(packet_header_type,
 		"bt_ctf_trace_get_packet_header_type returns a packet header");
+
+	packet_context_type = bt_ctf_stream_class_get_packet_context_type(stream_class);
+	ok(packet_context_type,
+		"bt_ctf_stream_class_get_packet_context_type returns a packet context type.");
+	ok(bt_ctf_field_type_get_type_id(packet_context_type) == CTF_TYPE_STRUCT,
+		"Packet context is a structure");
+	uint_64_type = bt_ctf_field_type_integer_create(64);
+	ret = bt_ctf_field_type_structure_add_field(packet_context_type,
+		uint_64_type, "packet_seq_num");
+	ok(ret == 0, "Packet context field added successfully");
+
+
 	/*
 	ret_field_type = bt_ctf_field_type_structure_get_field_type_by_name(
 		packet_header_type, "magic");
@@ -174,6 +195,7 @@ int main(int argc, char **argv)
 	ok(stream2, "Instanciate a stream class from writer");
 
 	uint_32_type = bt_ctf_field_type_integer_create(32);
+	uint_64_type = bt_ctf_field_type_integer_create(64);
 	ok(bt_ctf_event_class_add_field(simple_event_class, uint_32_type,
 		"dummy_value") == 0, "Add field");
 	ok(bt_ctf_event_class_add_field(simple_event_class, uint_32_type,
@@ -215,7 +237,6 @@ int main(int argc, char **argv)
 	create_packet(stream1, 5, 81, 100, 82);
 	create_packet(stream2, 6, 91, 110, 101);
 	create_packet(stream2, 7, 111, 120, 112);
-#endif
 
 	/*
 	 * nointersect
@@ -232,6 +253,44 @@ int main(int argc, char **argv)
 	create_packet(stream2, 3, 70, 90, 71);
 	create_packet(stream2, 4, 91, 110, 101);
 	create_packet(stream2, 5, 111, 120, 112);
+
+	/*
+	 * Test the seq_num feature
+	 */
+	// no lost
+	create_packet(stream1, 0, 0, 20, 10, 0);
+	create_packet(stream1, 1, 21, 40, 21, 1);
+	create_packet(stream1, 2, 41, 60, 42, 2);
+
+	// no_lost_not_starting_at_0
+	create_packet(stream1, 0, 0, 20, 10, 3);
+	create_packet(stream1, 1, 21, 40, 21, 4);
+	create_packet(stream1, 2, 41, 60, 42, 5);
+
+	//2 lost before last
+	create_packet(stream1, 0, 0, 20, 10, 0);
+	create_packet(stream1, 1, 21, 40, 21, 1);
+	create_packet(stream1, 2, 41, 60, 42, 4);
+	// 2_streams_lost_in_1
+	create_packet(stream1, 0, 0, 20, 10, 0);
+	create_packet(stream1, 1, 21, 40, 21, 1);
+	create_packet(stream1, 2, 41, 60, 42, 2);
+	create_packet(stream2, 3, 70, 90, 71, 0);
+	create_packet(stream1, 4, 61, 80, 72, 3);
+	create_packet(stream1, 5, 81, 100, 82, 6);
+	create_packet(stream2, 6, 91, 110, 101, 1);
+	create_packet(stream2, 7, 111, 120, 112, 2);
+#endif
+
+	// 2_streams_lost_in_2
+	create_packet(stream1, 0, 0, 20, 10, 0);
+	create_packet(stream1, 1, 21, 40, 21, 1);
+	create_packet(stream1, 2, 41, 60, 42, 2);
+	create_packet(stream2, 3, 70, 90, 71, 0);
+	create_packet(stream1, 4, 61, 80, 72, 3);
+	create_packet(stream1, 5, 81, 100, 82, 6);
+	create_packet(stream2, 6, 91, 110, 101, 4);
+	create_packet(stream2, 7, 111, 120, 112, 6);
 
 	bt_ctf_writer_flush_metadata(writer);
 
