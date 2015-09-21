@@ -197,8 +197,9 @@ int main(int argc, char **argv)
 	bt_ctf_event_set_payload(simple_event, "packet_begin", begin_field);
 	bt_ctf_event_set_payload(simple_event, "packet_end", end_field);
 
-
+#if 0
 	/*
+	 * 3eventsintersect
 	 * Packets:
 	 * - stream 1: [0, 20] [21, 40] [41, 60] [61, 80] [81, 100]
 	 * - stream 2: [70, 90] [91, 110] [111, 120]
@@ -214,6 +215,23 @@ int main(int argc, char **argv)
 	create_packet(stream1, 5, 81, 100, 82);
 	create_packet(stream2, 6, 91, 110, 101);
 	create_packet(stream2, 7, 111, 120, 112);
+#endif
+
+	/*
+	 * nointersect
+	 * Packets:
+	 * - stream 1: [0, 20] [21, 40] [41, 60]
+	 * - stream 2: [70, 90] [91, 110] [111, 120]
+	 *
+	 * Intersection: [70, 100], so we should see events from the second
+	 * packet of stream1 and from the only packet of stream 2.
+	*/
+	create_packet(stream1, 0, 0, 20, 10);
+	create_packet(stream1, 1, 21, 40, 21);
+	create_packet(stream1, 2, 41, 60, 42);
+	create_packet(stream2, 3, 70, 90, 71);
+	create_packet(stream2, 4, 91, 110, 101);
+	create_packet(stream2, 5, 111, 120, 112);
 
 	bt_ctf_writer_flush_metadata(writer);
 
