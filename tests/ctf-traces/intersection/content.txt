@@ -1,0 +1,14 @@
+The traces in this folder are designed to test the --packet-intersect feature.
+Here is a description of all the traces:
+- 3eventsintersect:
+  2 streams, only 3 events in the middle of the trace intersect between the 2
+  streams
+- 3eventsintersectreverse
+  Same as 3eventsintersect but switched the filenames to make sure the order
+  of trace file open has no impact on the intersection detection
+- nointersect
+  No common time range between the 2 streams in this trace
+- nostream
+  No stream at all in the trace
+- onestream
+  Only one stream, so all events should intersect
