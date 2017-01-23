@@ -64,6 +64,7 @@ struct text_options {
 	bool clock_date;
 	bool clock_gmt;
 	bool debug_info_full_path;
+	bool verbose;
 };
 
 struct text_component {
