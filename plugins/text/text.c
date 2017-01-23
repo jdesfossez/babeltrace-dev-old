@@ -612,6 +612,25 @@ end:
 }
 
 static
+void init_stream_packet_context_quarks(void)
+{
+	stream_packet_context_quarks[Q_TIMESTAMP_BEGIN] = \
+		g_quark_from_string("timestamp_begin");
+	stream_packet_context_quarks[Q_TIMESTAMP_BEGIN] = \
+		g_quark_from_string("timestamp_begin");
+	stream_packet_context_quarks[Q_TIMESTAMP_END] = \
+		g_quark_from_string("timestamp_end");
+	stream_packet_context_quarks[Q_EVENTS_DISCARDED] = \
+		g_quark_from_string("events_discarded");
+	stream_packet_context_quarks[Q_CONTENT_SIZE] = \
+		g_quark_from_string("content_size");
+	stream_packet_context_quarks[Q_PACKET_SIZE] = \
+		g_quark_from_string("packet_size");
+	stream_packet_context_quarks[Q_PACKET_SEQ_NUM] = \
+		g_quark_from_string("packet_seq_num");
+}
+
+static
 enum bt_component_status text_component_init(
 		struct bt_component *component, struct bt_value *params,
 		UNUSED_VAR void *init_method_data)
@@ -642,6 +661,9 @@ enum bt_component_status text_component_init(
 	if (ret != BT_COMPONENT_STATUS_OK) {
 		goto error;
 	}
+
+	init_stream_packet_context_quarks();
+
 end:
 	return ret;
 error:
