@@ -36,12 +36,12 @@
 #include <unistd.h>
 #include <dwarf.h>
 #include <glib.h>
-#include <babeltrace/dwarf.h>
-#include <babeltrace/bin-info.h>
-#include <babeltrace/crc32.h>
-#include <babeltrace/babeltrace-internal.h>
-#include <babeltrace/utils.h>
 #include <errno.h>
+#include <babeltrace/babeltrace-internal.h>
+#include "dwarf.h"
+#include "bin-info.h"
+#include "crc32.h"
+#include "utils.h"
 
 /*
  * An address printed in hex is at most 20 bytes (16 for 64-bits +
@@ -156,7 +156,8 @@ error:
 }
 
 BT_HIDDEN
-int bin_info_set_debug_link(struct bin_info *bin, char *filename, uint32_t crc)
+int bin_info_set_debug_link(struct bin_info *bin, const char *filename,
+		uint32_t crc)
 {
 	if (!bin || !filename) {
 		goto error;

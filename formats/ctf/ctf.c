@@ -36,7 +36,6 @@
 #include <babeltrace/context-internal.h>
 #include <babeltrace/compat/uuid.h>
 #include <babeltrace/endian.h>
-#include <babeltrace/trace-debug-info.h>
 #include <babeltrace/ctf/ctf-index.h>
 #include <inttypes.h>
 #include <stdio.h>
@@ -2492,17 +2491,8 @@ struct bt_trace_descriptor *ctf_open_trace(const char *path, int flags,
 		goto error;
 	}
 
-	ret = trace_debug_info_create(td);
-	if (ret) {
-		goto error;
-	}
-
 	return &td->parent;
 error:
-	if (td) {
-		trace_debug_info_destroy(td);
-		g_free(td);
-	}
 	return NULL;
 }
 
@@ -2670,11 +2660,6 @@ struct bt_trace_descriptor *ctf_open_mmap_trace(
 	if (ret)
 		goto error_free;
 
-	ret = trace_debug_info_create(td);
-	if (ret) {
-		goto error_free;
-	}
-
 	return &td->parent;
 
 error_free:
@@ -2826,7 +2811,6 @@ int ctf_close_trace(struct bt_trace_descriptor *tdp)
 		}
 	}
 	free(td->metadata_string);
-	trace_debug_info_destroy(td);
 	g_free(td);
 	return 0;
 }

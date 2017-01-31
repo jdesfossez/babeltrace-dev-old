@@ -497,6 +497,7 @@ AC_CONFIG_FILES([
 	plugins/utils/dummy/Makefile
 	plugins/utils/trimmer/Makefile
 	plugins/libctfcopytrace/Makefile
+	plugins/debug-info/Makefile
 	babeltrace.pc
 	babeltrace-ctf.pc
 ])

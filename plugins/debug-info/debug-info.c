@@ -27,12 +27,9 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <babeltrace/types.h>
-#include <babeltrace/ctf-ir/metadata.h>
-#include <babeltrace/debug-info.h>
-#include <babeltrace/bin-info.h>
-#include <babeltrace/babeltrace-internal.h>
-#include <babeltrace/utils.h>
+#include "debug-info.h"
+#include "bin-info.h"
+#include "utils.h"
 
 struct proc_debug_info_sources {
 	/*
@@ -371,9 +368,10 @@ end:
 	return;
 }
 
+#if 0
 static
 void handle_statedump_build_id_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
 	struct proc_debug_info_sources *proc_dbg_info_src;
 	struct bt_definition *event_fields_def = NULL;
@@ -389,7 +387,7 @@ void handle_statedump_build_id_event(struct debug_info *debug_info,
 	uint8_t *build_id = NULL;
 	uint64_t build_id_len;
 
-	event_fields_def = (struct bt_definition *) event_def->event_fields;
+	event_fields_def = (struct bt_definition *) event_def->fields;
 	sec_def = (struct bt_definition *)
 			event_def->stream->stream_event_context;
 
@@ -465,70 +463,146 @@ end:
 	free(build_id);
 	return;
 }
+#endif
 
 static
+struct bt_ctf_field *get_field(struct bt_ctf_field *context,
+		struct bt_ctf_event *event, const char *field_name,
+		struct bt_ctf_field_type *field_type)
+{
+	struct bt_ctf_field *field = NULL;
+	struct bt_ctf_field_type *struct_type;
+	int ret, index;
+	const char *name;
+
+	struct_type = bt_ctf_field_get_type(context);
+	if (!struct_type) {
+		ret = -1;
+		goto end;
+	}
+
+	/*
+	index = bt_ctf_field_type_structure_get_field_name_index(struct_type,
+			field_name);
+	if (index < 0) {
+		ret = -1;
+		goto end_put_type;
+	}
+	*/
+	return NULL;
+
+	field =  bt_ctf_field_structure_get_field_by_index(context, index);
+	if (!field) {
+		ret = -1;
+		goto end_put_type;
+	}
+
+	ret = bt_ctf_field_type_structure_get_field(struct_type, &name,
+			&field_type, index);
+	if (ret < 0) {
+		ret = -1;
+		bt_put(field);
+		goto end_put_type;
+	}
+
+end_put_type:
+	bt_put(struct_type);
+end:
+	return field;
+}
+
+#if 0
+static
 void handle_statedump_debug_link_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
 	struct proc_debug_info_sources *proc_dbg_info_src;
-	struct bt_definition *event_fields_def = NULL;
-	struct bt_definition *sec_def = NULL;
-	struct bt_definition *baddr_def = NULL;
-	struct bt_definition *vpid_def = NULL;
-	struct bt_definition *filename_def = NULL;
-	struct bt_definition *crc32_def = NULL;
 	struct bin_info *bin = NULL;
 	int64_t vpid;
-	uint64_t baddr;
-	char *filename = NULL;
+	uint64_t baddr, ret_uint64_t;
+	const char *filename = NULL;
 	uint32_t crc32;
+	int ret;
 
-	event_fields_def = (struct bt_definition *) event_def->event_fields;
-	sec_def = (struct bt_definition *)
-			event_def->stream->stream_event_context;
 
-	if (!event_fields_def || !sec_def) {
+	struct bt_ctf_field *context;
+	struct bt_ctf_field *field;
+	struct bt_ctf_field_type *field_type = NULL;
+
+	context = bt_ctf_event_get_stream_event_context(event);
+	if (!context) {
+		ret = -1;
 		goto end;
 	}
 
-	baddr_def = bt_lookup_definition(event_fields_def, "_baddr");
-	if (!baddr_def) {
+	field = get_field(context, event, "_vpid", field_type);
+	if (!field) {
+		goto end_put_context;
+	}
+	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
+		goto end_put_field;
+	}
+	ret = bt_ctf_field_signed_integer_get_value(field, &vpid);
+	if (ret < 0) {
+		goto end_put_field;
+	}
+
+	bt_put(field);
+	bt_put(field_type);
+	bt_put(context);
+
+	context = bt_ctf_event_get_payload_field(event);
+	if (!context) {
+		ret = -1;
 		goto end;
 	}
 
-	vpid_def = bt_lookup_definition(sec_def, "_vpid");
-	if (!vpid_def) {
-		goto end;
+	field = get_field(context, event, "_baddr", field_type);
+	if (!field) {
+		goto end_put_context;
+	}
+	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
+		goto end_put_field;
+	}
+	ret = bt_ctf_field_unsigned_integer_get_value(field, &baddr);
+	if (ret < 0) {
+		goto end_put_field;
 	}
 
-	filename_def = bt_lookup_definition(event_fields_def, "_filename");
-	if (!filename_def) {
-		goto end;
+	bt_put(field);
+	bt_put(field_type);
+
+	field = get_field(context, event, "_crc32", field_type);
+	if (!field) {
+		goto end_put_context;
+	}
+	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
+		goto end_put_field;
+	}
+	ret = bt_ctf_field_unsigned_integer_get_value(field, &ret_uint64_t);
+	if (ret < 0) {
+		goto end_put_field;
+	}
+	crc32 = (uint32_t) ret_uint64_t;
+
+	bt_put(field);
+	bt_put(field_type);
+
+	field = get_field(context, event, "_filename", field_type);
+	if (!field) {
+		goto end_put_context;
+	}
+	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_STRING) {
+		goto end_put_field;
+	}
+	filename = bt_ctf_field_string_get_value(field);
+	if (!filename) {
+		goto end_put_field;
 	}
 
-	crc32_def = bt_lookup_definition(event_fields_def, "_crc32");
-	if (!crc32_def) {
-		goto end;
-	}
-
-	if (baddr_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (vpid_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (filename_def->declaration->id != BT_CTF_TYPE_ID_STRING) {
-		goto end;
-	}
-
-	if (crc32_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	baddr = bt_get_unsigned_int(baddr_def);
-	vpid = bt_get_signed_int(vpid_def);
+	bt_put(field);
+	bt_put(field_type);
+	bt_put(context);
 
 	proc_dbg_info_src = proc_debug_info_sources_ht_get_entry(
 			debug_info->vpid_to_proc_dbg_info_src, vpid);
@@ -546,18 +620,22 @@ void handle_statedump_debug_link_event(struct debug_info *debug_info,
 		goto end;
 	}
 
-	filename = bt_get_string(filename_def);
-	crc32 = bt_get_unsigned_int(crc32_def);
-
 	bin_info_set_debug_link(bin, filename, crc32);
 
+	goto end;
+
+end_put_context:
+	bt_put(context);
+end_put_field:
+	bt_put(field);
+	bt_put(field_type);
 end:
 	return;
 }
 
 static
 void handle_bin_info_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def, bool has_pic_field)
+		struct bt_ctf_event *event, bool has_pic_field)
 {
 	struct bt_definition *baddr_def = NULL;
 	struct bt_definition *memsz_def = NULL;
@@ -574,7 +652,7 @@ void handle_bin_info_event(struct debug_info *debug_info,
 	gpointer key = NULL;
 	bool is_pic;
 
-	event_fields_def = (struct bt_definition *) event_def->event_fields;
+	event_fields_def = (struct bt_definition *) event_def->fields;
 	sec_def = (struct bt_definition *)
 		event_def->stream->stream_event_context;
 
@@ -687,21 +765,21 @@ end:
 
 static inline
 void handle_statedump_bin_info_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
-	handle_bin_info_event(debug_info, event_def, true);
+	handle_bin_info_event(debug_info, event, true);
 }
 
 static inline
 void handle_lib_load_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
-	handle_bin_info_event(debug_info, event_def, false);
+	handle_bin_info_event(debug_info, event, false);
 }
 
 static inline
 void handle_lib_unload_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
 	struct bt_definition *baddr_def = NULL;
 	struct bt_definition *event_fields_def = NULL;
@@ -712,7 +790,7 @@ void handle_lib_unload_event(struct debug_info *debug_info,
 	int64_t vpid;
 	gpointer key_ptr = NULL;
 
-	event_fields_def = (struct bt_definition *) event_def->event_fields;
+	event_fields_def = (struct bt_definition *) event_def->fields;
 	sec_def = (struct bt_definition *)
 			event_def->stream->stream_event_context;
 	if (!event_fields_def || !sec_def) {
@@ -754,7 +832,7 @@ end:
 
 static
 void handle_statedump_start(struct debug_info *debug_info,
-		struct ctf_event_definition *event_def)
+		struct bt_ctf_event *event)
 {
 	struct bt_definition *vpid_def = NULL;
 	struct bt_definition *sec_def = NULL;
@@ -789,7 +867,7 @@ end:
 
 static
 void register_event_debug_infos(struct debug_info *debug_info,
-		struct ctf_event_definition *event)
+		struct bt_ctf_event_class *event)
 {
 	struct bt_definition *ip_def, *vpid_def;
 	int64_t vpid;
@@ -821,27 +899,39 @@ void register_event_debug_infos(struct debug_info *debug_info,
 end:
 	return;
 }
+#endif
 
 BT_HIDDEN
-void debug_info_handle_event(struct debug_info *debug_info,
-		struct ctf_event_definition *event)
+void debug_info_handle_event(struct bt_ctf_trace *trace_class,
+		struct bt_ctf_event *event)
 {
-	struct ctf_event_declaration *event_class;
-	struct ctf_stream_declaration *stream_class;
+	struct bt_ctf_event_class *event_class;
+	//struct debug_info *debug_info = trace_class->debug_info;
+	struct debug_info *debug_info = NULL;
+	const char *event_name;
+	GQuark q_event_name;
 
-	if (!debug_info || !event) {
+	if (!trace_class || !debug_info || !event) {
 		goto end;
 	}
 
-	stream_class = event->stream->stream_class;
-	event_class = g_ptr_array_index(stream_class->events_by_id,
-			event->stream->event_id);
+	event_class = bt_ctf_event_get_class(event);
+	if (!event_class) {
+		goto end;
+	}
 
-	if (event_class->name == debug_info->q_statedump_bin_info) {
+	event_name = bt_ctf_event_class_get_name(event_class);
+	if (!event_name) {
+		goto end_put_class;
+	}
+	q_event_name = g_quark_try_string(event_name);
+
+#if 0
+	if (q_event_name == debug_info->q_statedump_bin_info) {
 		/* State dump */
 		handle_statedump_bin_info_event(debug_info, event);
-	} else if (event_class->name == debug_info->q_dl_open ||
-			event_class->name == debug_info->q_lib_load) {
+	} else if (q_event_name == debug_info->q_dl_open ||
+			q_event_name == debug_info->q_lib_load) {
 		/*
 		 * dl_open and lib_load events are both checked for since
 		 * only dl_open was produced as of lttng-ust 2.8.
@@ -852,22 +942,25 @@ void debug_info_handle_event(struct debug_info *debug_info,
 		 * library are transitively loaded.
 		 */
 		handle_lib_load_event(debug_info, event);
-	} else if (event_class->name == debug_info->q_statedump_start) {
+	} else if (q_event_name == debug_info->q_statedump_start) {
 		/* Start state dump */
 		handle_statedump_start(debug_info, event);
-	} else if (event_class->name == debug_info->q_statedump_debug_link) {
+	} else if (q_event_name == debug_info->q_statedump_debug_link) {
 		/* Debug link info */
 		handle_statedump_debug_link_event(debug_info, event);
-	} else if (event_class->name == debug_info->q_statedump_build_id) {
+	} else if (q_event_name == debug_info->q_statedump_build_id) {
 		/* Build ID info */
 		handle_statedump_build_id_event(debug_info, event);
-	} else if (event_class->name == debug_info-> q_lib_unload) {
+	} else if (q_event_name == debug_info-> q_lib_unload) {
 		handle_lib_unload_event(debug_info, event);
 	}
+#endif
 
 	/* All events: register debug infos */
-	register_event_debug_infos(debug_info, event);
+//	register_event_debug_infos(debug_info, event);
 
+end_put_class:
+	bt_put(event_class);
 end:
 	return;
 }

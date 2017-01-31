@@ -22,7 +22,3 @@ libbabeltrace_ctf_la_LIBADD = \
 	metadata/libctf-ast.la \
 	writer/libctf-writer.la \
 	ir/libctf-ir.la
-
-if ENABLE_DEBUG_INFO
-libbabeltrace_ctf_la_LIBADD += $(top_builddir)/lib/libdebug-info.la
-endif
