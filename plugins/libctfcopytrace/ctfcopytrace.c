@@ -405,18 +405,15 @@ struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 	}
 
 	type = bt_ctf_stream_class_get_event_context_type(stream_class);
-	if (!type) {
-		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
-				__LINE__);
-		goto error;
-	}
-	ret_int = bt_ctf_stream_class_set_event_context_type(
-			writer_stream_class, type);
-	bt_put(type);
-	if (ret_int < 0) {
-		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
-				__LINE__);
-		goto error;
+	if (type) {
+		ret_int = bt_ctf_stream_class_set_event_context_type(
+				writer_stream_class, type);
+		bt_put(type);
+		if (ret_int < 0) {
+			fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+					__LINE__);
+			goto error;
+		}
 	}
 
 	goto end;
