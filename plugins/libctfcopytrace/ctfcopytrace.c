@@ -37,6 +37,7 @@
 #include <assert.h>
 
 #include "ctfcopytrace.h"
+#include "clock-fields.h"
 
 struct bt_ctf_clock_class *ctf_copy_clock_class(FILE *err,
 		struct bt_ctf_clock_class *clock_class)
@@ -357,7 +358,7 @@ end:
 struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 		struct bt_ctf_stream_class *stream_class)
 {
-	struct bt_ctf_field_type *type;
+	struct bt_ctf_field_type *type, *new_event_header_type;
 	struct bt_ctf_stream_class *writer_stream_class;
 	int ret_int;
 	const char *name = bt_ctf_stream_class_get_name(stream_class);
@@ -396,8 +397,17 @@ struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 		goto error;
 	}
 
+	new_event_header_type = override_header_type(err, type);
+	bt_put(type);
+	if (!new_event_header_type) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto error;
+	}
+
 	ret_int = bt_ctf_stream_class_set_event_header_type(
-			writer_stream_class, type);
+			writer_stream_class, new_event_header_type);
+	bt_put(new_event_header_type);
 	if (ret_int < 0) {
 		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
 				__LINE__);
@@ -635,16 +645,23 @@ struct bt_ctf_event *ctf_copy_event(FILE *err, struct bt_ctf_event *event,
 		goto end;
 	}
 
-	copy_field = bt_ctf_field_copy(field);
+	copy_field = bt_ctf_event_get_header(writer_event);
+	if (!copy_field) {
+		BT_PUT(writer_event);
+		bt_put(field);
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		goto end;
+	}
+
+	ret = copy_override_field(err, event, field, copy_field);
 	bt_put(field);
-	if (copy_field) {
-		ret = bt_ctf_event_set_header(writer_event, copy_field);
-		if (ret < 0) {
-			fprintf(err, "[error] %s in %s:%d\n", __func__,
-					__FILE__, __LINE__);
-			goto error;
-		}
-		bt_put(copy_field);
+	if (ret) {
+		BT_PUT(writer_event);
+		BT_PUT(copy_field);
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		goto end;
 	}
 
 	/* Optional field, so it can fail silently. */
