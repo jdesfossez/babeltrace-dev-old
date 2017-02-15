@@ -200,6 +200,7 @@ struct bt_ctf_writer *insert_new_writer(
 	}
 
 	ret = ctf_copy_trace(writer_component->err, trace, writer_trace);
+	bt_put(writer_trace);
 	if (ret != BT_COMPONENT_STATUS_OK) {
 		fprintf(writer_component->err, "[error] Failed to copy trace\n");
 		fprintf(writer_component->err, "[error] %s in %s:%d\n",
