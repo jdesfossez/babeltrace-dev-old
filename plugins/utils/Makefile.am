@@ -12,4 +12,4 @@ libbabeltrace_plugin_utils_la_LIBADD = \
 	$(top_builddir)/lib/libbabeltrace.la \
 	$(top_builddir)/formats/ctf/libbabeltrace-ctf.la \
 	dummy/libbabeltrace-plugin-dummy-cc.la \
-	trimmer/libbabeltrace-plugin-dummy-cc.la
+	trimmer/libbabeltrace-plugin-trimmer.la
