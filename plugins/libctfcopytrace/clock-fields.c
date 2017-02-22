@@ -41,73 +41,108 @@
 #include "clock-fields.h"
 
 static
-int find_update_struct_clock_fields(FILE *err, struct bt_ctf_field_type *type);
+int find_update_struct_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class);
 static
-int find_update_array_clock_fields(FILE *err, struct bt_ctf_field_type *type);
+int find_update_array_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class);
 static
-int find_update_enum_clock_fields(FILE *err, struct bt_ctf_field_type *type);
+int find_update_enum_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class);
 static
-int find_update_sequence_clock_fields(FILE *err, struct bt_ctf_field_type *type);
+int find_update_sequence_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class);
 static
-int find_update_variant_clock_fields(FILE *err, struct bt_ctf_field_type *type);
+int find_update_variant_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class);
 
 static
 int copy_find_clock_int_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field);
 static
 int copy_find_clock_struct_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field);
 static
 int copy_find_clock_array_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field);
 static
 int copy_find_clock_sequence_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field);
 static
 int copy_find_clock_variant_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
-		struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
 static
 int copy_find_clock_enum_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
-		struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field);
 
 static
-int update_header_clock_int_field_type(FILE *err, struct bt_ctf_field_type *type)
+int update_header_clock_int_field_type(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	struct bt_ctf_clock_class *clock;
+	int ret;
 
 	clock = bt_ctf_field_type_integer_get_mapped_clock_class(type);
 	if (!clock) {
 		return 0;
 	}
+	bt_put(clock);
 
-	return bt_ctf_field_type_integer_set_size(type, 64);
+	ret = bt_ctf_field_type_integer_set_size(type, 64);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	ret = bt_ctf_field_type_integer_set_mapped_clock_class(type,
+			writer_clock_class);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+end:
+	return ret;
 }
 
 static
-int find_update_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int ret;
 
 	switch (bt_ctf_field_type_get_type_id(type)) {
 	case BT_CTF_TYPE_ID_INTEGER:
-		return update_header_clock_int_field_type(err, type);
+		return update_header_clock_int_field_type(err, type,
+				writer_clock_class);
 	case BT_CTF_TYPE_ID_STRUCT:
-		return find_update_struct_clock_fields(err, type);
+		return find_update_struct_clock_fields(err, type,
+				writer_clock_class);
 	case BT_CTF_TYPE_ID_ARRAY:
-		return find_update_array_clock_fields(err, type);
+		return find_update_array_clock_fields(err, type,
+				writer_clock_class);
 	case BT_CTF_TYPE_ID_SEQUENCE:
-		return find_update_sequence_clock_fields(err, type);
+		return find_update_sequence_clock_fields(err, type,
+				writer_clock_class);
 	case BT_CTF_TYPE_ID_UNTAGGED_VARIANT:
 	case BT_CTF_TYPE_ID_VARIANT:
-		return find_update_variant_clock_fields(err, type);
+		return find_update_variant_clock_fields(err, type,
+				writer_clock_class);
 	case BT_CTF_TYPE_ID_ENUM:
-		return find_update_enum_clock_fields(err, type);
+		return find_update_enum_clock_fields(err, type,
+				writer_clock_class);
 		break;
 	default:
 		break;
@@ -119,7 +154,8 @@ int find_update_clock_fields(FILE *err, struct bt_ctf_field_type *type)
 }
 
 static
-int find_update_variant_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_variant_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int count, i, ret;
 
@@ -136,7 +172,8 @@ int find_update_variant_clock_fields(FILE *err, struct bt_ctf_field_type *type)
 			ret = -1;
 			goto end;
 		}
-		ret = find_update_clock_fields(err, entry_type);
+		ret = find_update_clock_fields(err, entry_type,
+				writer_clock_class);
 		bt_put(entry_type);
 		if (ret) {
 			fprintf(err, "[error] %s in %s:%d\n",
@@ -153,7 +190,8 @@ end:
 }
 
 static
-int find_update_struct_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_struct_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int count, i, ret;
 
@@ -170,7 +208,8 @@ int find_update_struct_clock_fields(FILE *err, struct bt_ctf_field_type *type)
 			ret = -1;
 			goto end;
 		}
-		ret = find_update_clock_fields(err, entry_type);
+		ret = find_update_clock_fields(err, entry_type,
+				writer_clock_class);
 		bt_put(entry_type);
 		if (ret) {
 			fprintf(err, "[error] %s in %s:%d\n",
@@ -187,13 +226,14 @@ end:
 }
 
 static
-int find_update_sequence_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_sequence_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int ret;
 	struct bt_ctf_field_type *entry_type;
 
 	entry_type = bt_ctf_field_type_sequence_get_element_type(type);
-	ret = find_update_clock_fields(err, entry_type);
+	ret = find_update_clock_fields(err, entry_type, writer_clock_class);
 	bt_put(entry_type);
 	if (ret) {
 		fprintf(err, "[error] %s in %s:%d\n",
@@ -209,13 +249,14 @@ end:
 }
 
 static
-int find_update_array_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_array_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int ret;
 	struct bt_ctf_field_type *entry_type;
 
 	entry_type = bt_ctf_field_type_array_get_element_type(type);
-	ret = find_update_clock_fields(err, entry_type);
+	ret = find_update_clock_fields(err, entry_type, writer_clock_class);
 	bt_put(entry_type);
 	if (ret) {
 		fprintf(err, "[error] %s in %s:%d\n",
@@ -231,13 +272,14 @@ end:
 }
 
 static
-int find_update_enum_clock_fields(FILE *err, struct bt_ctf_field_type *type)
+int find_update_enum_clock_fields(FILE *err, struct bt_ctf_field_type *type,
+		struct bt_ctf_clock_class *writer_clock_class)
 {
 	int ret;
 	struct bt_ctf_field_type *entry_type;
 
 	entry_type = bt_ctf_field_type_enumeration_get_container_type(type);
-	ret = find_update_clock_fields(err, entry_type);
+	ret = find_update_clock_fields(err, entry_type, writer_clock_class);
 	bt_put(entry_type);
 	if (ret) {
 		fprintf(err, "[error] %s in %s:%d\n",
@@ -254,16 +296,26 @@ end:
 
 BT_HIDDEN
 struct bt_ctf_field_type *override_header_type(FILE *err,
-		struct bt_ctf_field_type *type)
+		struct bt_ctf_field_type *type,
+		struct bt_ctf_trace *writer_trace)
 {
 	struct bt_ctf_field_type *new_type;
 	int ret;
+	struct bt_ctf_clock_class *writer_clock_class;
+
+	/* FIXME multi-clock? */
+	writer_clock_class = bt_ctf_trace_get_clock_class(writer_trace, 0);
+	if (!writer_clock_class) {
+		fprintf(err, "[error] %s in %s:%d\n",
+				__func__, __FILE__, __LINE__);
+		goto end;
+	}
 
 	new_type = bt_ctf_field_type_copy(type);
 	if (!new_type) {
 		fprintf(err, "[error] %s in %s:%d\n",
 				__func__, __FILE__, __LINE__);
-		goto end;
+		goto end_put;
 	}
 
 	if (bt_ctf_field_type_get_type_id(new_type) != BT_CTF_TYPE_ID_STRUCT) {
@@ -271,17 +323,19 @@ struct bt_ctf_field_type *override_header_type(FILE *err,
 		goto error;
 	}
 
-	ret = find_update_struct_clock_fields(err, new_type);
+	ret = find_update_struct_clock_fields(err, new_type, writer_clock_class);
 	if (ret) {
 		fprintf(err, "[error] %s in %s:%d\n",
 				__func__, __FILE__, __LINE__);
 		goto error;
 	}
 
-	goto end;
+	goto end_put;
 
 error:
 	BT_PUT(new_type);
+end_put:
+	bt_put(writer_clock_class);
 end:
 	return new_type;
 }
@@ -346,12 +400,13 @@ end:
 
 BT_HIDDEN
 int copy_override_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field, struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field *copy_field)
 {
 	struct bt_ctf_field_type *type;
 	int ret;
 
-	type = bt_ctf_field_get_type(copy_field);
+	type = bt_ctf_field_get_type(field);
 	if (!type) {
 		ret = -1;
 		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
@@ -361,40 +416,39 @@ int copy_override_field(FILE *err, struct bt_ctf_event *event,
 
 	switch (bt_ctf_field_type_get_type_id(type)) {
 	case BT_CTF_TYPE_ID_INTEGER:
-		ret = copy_find_clock_int_field(err, event, field, type,
-				copy_field);
+		ret = copy_find_clock_int_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_STRUCT:
-		ret = copy_find_clock_struct_field(err, event, field,
-				type, copy_field);
+		ret = copy_find_clock_struct_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_FLOAT:
 		ret = copy_float_field(err, field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_ENUM:
-		ret = copy_find_clock_enum_field(err, event, field, type,
-				copy_field);
+		ret = copy_find_clock_enum_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_STRING:
 		ret = copy_string_field(err, field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_ARRAY:
-		ret = copy_find_clock_array_field(err, event, field, type,
-				copy_field);
+		ret = copy_find_clock_array_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_SEQUENCE:
-		ret = copy_find_clock_sequence_field(err, event, field, type,
-				copy_field);
+		ret = copy_find_clock_sequence_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	case BT_CTF_TYPE_ID_UNTAGGED_VARIANT:
 	case BT_CTF_TYPE_ID_VARIANT:
-		ret = copy_find_clock_variant_field(err, event, field, type,
-				copy_field);
+		ret = copy_find_clock_variant_field(err, event, writer_event,
+				field, type, copy_field);
 		break;
 	/* No default, we want to catch missing field types. */
 	case BT_CTF_TYPE_ID_UNKNOWN:
 	case BT_CTF_NR_TYPE_IDS:
-		bt_put(type);
 		break;
 	}
 
@@ -407,9 +461,8 @@ end:
 
 static
 int copy_find_clock_enum_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type,
-		struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
 {
 	int ret;
 	struct bt_ctf_field *container, *copy_container;
@@ -430,7 +483,8 @@ int copy_find_clock_enum_field(FILE *err, struct bt_ctf_event *event,
 		goto end_put_container;
 	}
 
-	ret = copy_override_field(err, event, container, copy_container);
+	ret = copy_override_field(err, event, writer_event, container,
+			copy_container);
 	if (ret) {
 		ret = -1;
 		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
@@ -448,9 +502,8 @@ end:
 
 static
 int copy_find_clock_variant_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type,
-		struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
 {
 	int ret;
 	struct bt_ctf_field *tag;
@@ -481,7 +534,8 @@ int copy_find_clock_variant_field(FILE *err, struct bt_ctf_event *event,
 		goto end_put_variant_field;
 	}
 
-	ret = copy_override_field(err, event, variant_field, copy_variant_field);
+	ret = copy_override_field(err, event, writer_event, variant_field,
+			copy_variant_field);
 	if (ret) {
 		ret = -1;
 		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
@@ -503,8 +557,9 @@ end:
 
 static
 int copy_find_clock_sequence_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field)
 {
 	int ret;
 	uint64_t i, count;
@@ -564,7 +619,8 @@ int copy_find_clock_sequence_field(FILE *err,
 			goto end;
 		}
 
-		ret = copy_override_field(err, event, entry_field, entry_copy);
+		ret = copy_override_field(err, event, writer_event, entry_field,
+				entry_copy);
 		bt_put(entry_field);
 		bt_put(entry_copy);
 		if (ret) {
@@ -584,8 +640,9 @@ end:
 
 static
 int copy_find_clock_array_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field)
 {
 	int ret, count, i;
 	struct bt_ctf_field_type *entry_type;
@@ -617,7 +674,8 @@ int copy_find_clock_array_field(FILE *err,
 			goto end;
 		}
 
-		ret = copy_override_field(err, event, entry_field, entry_copy);
+		ret = copy_override_field(err, event, writer_event, entry_field,
+				entry_copy);
 		bt_put(entry_field);
 		bt_put(entry_copy);
 		if (ret) {
@@ -637,8 +695,9 @@ end:
 
 static
 int copy_find_clock_struct_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field)
 {
 	int count, i, ret;
 
@@ -669,13 +728,16 @@ int copy_find_clock_struct_field(FILE *err,
 
 		entry_copy = bt_ctf_field_structure_get_field_by_index(copy_field, i);
 		if (!entry_copy) {
+			bt_put(entry_field);
+			bt_put(entry_type);
 			ret = -1;
 			fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
 					__LINE__);
 			goto end;
 		}
 
-		ret = copy_override_field(err, event, entry_field, entry_copy);
+		ret = copy_override_field(err, event, writer_event, entry_field,
+				entry_copy);
 
 		bt_put(entry_copy);
 		bt_put(entry_field);
@@ -743,13 +805,64 @@ end:
 	return ret;
 }
 
+struct bt_ctf_clock_class *stream_class_get_clock_class(FILE *err,
+		struct bt_ctf_stream_class *stream_class)
+{
+	struct bt_ctf_trace *trace;
+	struct bt_ctf_clock_class *clock_class = NULL;
+
+	trace = bt_ctf_stream_class_get_trace(stream_class);
+	if (!trace) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	/* FIXME multi-clock? */
+	clock_class = bt_ctf_trace_get_clock_class(trace, 0);
+
+	bt_put(trace);
+end:
+	return clock_class;
+}
+
+struct bt_ctf_clock_class *event_get_clock_class(FILE *err, struct bt_ctf_event *event)
+{
+	struct bt_ctf_event_class *event_class;
+	struct bt_ctf_stream_class *stream_class;
+	struct bt_ctf_clock_class *clock_class = NULL;
+
+	event_class = bt_ctf_event_get_class(event);
+	if (!event_class) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	stream_class = bt_ctf_event_class_get_stream_class(event_class);
+	if (!stream_class) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end_put_event_class;
+	}
+
+	clock_class = stream_class_get_clock_class(err, stream_class);
+	bt_put(stream_class);
+
+end_put_event_class:
+	bt_put(event_class);
+end:
+	return clock_class;
+}
+
 static
 int copy_find_clock_int_field(FILE *err,
-		struct bt_ctf_event *event, struct bt_ctf_field *field,
-		struct bt_ctf_field_type *type, struct bt_ctf_field *copy_field)
+		struct bt_ctf_event *event, struct bt_ctf_event *writer_event,
+		struct bt_ctf_field *field, struct bt_ctf_field_type *type,
+		struct bt_ctf_field *copy_field)
 {
-	struct bt_ctf_clock_class *clock_class;
-	struct bt_ctf_clock_value *clock_value;
+	struct bt_ctf_clock_class *clock_class, *writer_clock_class;
+	struct bt_ctf_clock_value *clock_value, *writer_clock_value;
 	uint64_t value;
 	int ret;
 
@@ -775,6 +888,29 @@ int copy_find_clock_int_field(FILE *err,
 	}
 
 	ret = bt_ctf_field_unsigned_integer_set_value(copy_field, value);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	writer_clock_class = event_get_clock_class(err, writer_event);
+	if (!writer_clock_class) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	writer_clock_value = bt_ctf_clock_value_create(writer_clock_class, value);
+	bt_put(writer_clock_class);
+	if (!writer_clock_value) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+				__LINE__);
+		goto end;
+	}
+
+	ret = bt_ctf_event_set_clock_value(writer_event, writer_clock_value);
+	bt_put(writer_clock_value);
 	if (ret) {
 		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
 				__LINE__);

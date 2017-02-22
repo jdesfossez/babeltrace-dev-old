@@ -38,11 +38,21 @@ extern "C" {
 
 BT_HIDDEN
 struct bt_ctf_field_type *override_header_type(FILE *err,
-		struct bt_ctf_field_type *type);
+		struct bt_ctf_field_type *type,
+		struct bt_ctf_trace *writer_trace);
 
 BT_HIDDEN
 int copy_override_field(FILE *err, struct bt_ctf_event *event,
-		struct bt_ctf_field *field, struct bt_ctf_field *copy_field);
+		struct bt_ctf_event *writer_event, struct bt_ctf_field *field,
+		struct bt_ctf_field *copy_field);
+
+BT_HIDDEN
+struct bt_ctf_clock_class *stream_class_get_clock_class(FILE *err,
+		struct bt_ctf_stream_class *stream_class);
+
+BT_HIDDEN
+struct bt_ctf_clock_class *event_get_clock_class(FILE *err,
+		struct bt_ctf_event *event);
 
 #ifdef __cplusplus
 }
