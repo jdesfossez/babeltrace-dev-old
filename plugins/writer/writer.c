@@ -209,6 +209,7 @@ static
 enum bt_component_status run(struct bt_component *component)
 {
 	enum bt_component_status ret;
+	enum bt_notification_iterator_status it_ret;
 	struct bt_notification *notification = NULL;
 	struct bt_notification_iterator *it;
 	struct writer_component *writer_component =
@@ -243,7 +244,6 @@ enum bt_component_status run(struct bt_component *component)
 	ret = handle_notification(writer_component, notification);
 	writer_component->processed_first_event = true;
 end:
-	bt_put(it);
 	bt_put(notification);
 	return ret;
 }
