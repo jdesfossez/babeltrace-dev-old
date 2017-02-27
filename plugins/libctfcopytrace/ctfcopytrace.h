@@ -82,7 +82,8 @@ enum bt_component_status ctf_copy_event_classes(FILE *err,
  */
 struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 		struct bt_ctf_stream_class *stream_class,
-		struct bt_ctf_trace *writer_trace);
+		struct bt_ctf_trace *writer_trace,
+		bool override_ts64);
 
 /*
  * Copy the value of a packet context field and add it to the

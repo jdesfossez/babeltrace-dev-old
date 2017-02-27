@@ -356,7 +356,8 @@ end:
 
 struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 		struct bt_ctf_stream_class *stream_class,
-		struct bt_ctf_trace *writer_trace)
+		struct bt_ctf_trace *writer_trace,
+		bool override_ts64)
 {
 	struct bt_ctf_field_type *type, *new_event_header_type;
 	struct bt_ctf_stream_class *writer_stream_class;
@@ -397,12 +398,17 @@ struct bt_ctf_stream_class *ctf_copy_stream_class(FILE *err,
 		goto error;
 	}
 
-	new_event_header_type = override_header_type(err, type, writer_trace);
-	bt_put(type);
-	if (!new_event_header_type) {
-		fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
-				__LINE__);
-		goto error;
+	if (override_ts64) {
+		new_event_header_type = override_header_type(err, type,
+				writer_trace);
+		bt_put(type);
+		if (!new_event_header_type) {
+			fprintf(err, "[error] %s in %s:%d\n", __func__, __FILE__,
+					__LINE__);
+			goto error;
+		}
+	} else {
+		new_event_header_type = type;
 	}
 
 	ret_int = bt_ctf_stream_class_set_event_header_type(

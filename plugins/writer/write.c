@@ -79,7 +79,7 @@ struct bt_ctf_stream_class *insert_new_stream_class(
 	}
 
 	writer_stream_class = ctf_copy_stream_class(writer_component->err,
-			stream_class, writer_trace);
+			stream_class, writer_trace, true);
 	if (!writer_stream_class) {
 		fprintf(writer_component->err, "[error] Failed to copy stream class\n");
 		fprintf(writer_component->err, "[error] %s in %s:%d\n",
