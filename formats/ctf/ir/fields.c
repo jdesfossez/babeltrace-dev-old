@@ -574,7 +574,6 @@ error:
 	return ret_field;
 }
 
-BT_HIDDEN
 int bt_ctf_field_structure_set_field(struct bt_ctf_field *field,
 		const char *name, struct bt_ctf_field *value)
 {

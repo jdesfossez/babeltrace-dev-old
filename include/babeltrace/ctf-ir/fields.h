@@ -858,6 +858,13 @@ exist.
 extern struct bt_ctf_field *bt_ctf_field_structure_get_field(
 		struct bt_ctf_field *struct_field, const char *name);
 
+/*
+ * Set a field's value with an already allocated field instance.
+ * TODO: DOC
+ */
+extern int bt_ctf_field_structure_set_field(struct bt_ctf_field *structure,
+		const char *name, struct bt_ctf_field *value);
+
 /**
 @brief  Returns the @field at index \p index in the @structfield
 	\p struct_field.
