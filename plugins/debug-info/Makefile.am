@@ -1,4 +1,5 @@
-AM_CFLAGS = $(PACKAGE_CFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/plugins
+AM_CFLAGS = $(PACKAGE_CFLAGS) -I$(top_srcdir)/include -I$(top_srcdir)/plugins \
+	    -I$(top_srcdir)/plugins/libctfcopytrace
 
 SUBDIRS = .
 
@@ -10,10 +11,12 @@ noinst_HEADERS = \
 	debug-info.h \
 	dwarf.h \
 	bin-info.h \
-	utils.h
+	utils.h \
+	copy.h
 
 libbabeltrace_plugin_debug_info_la_SOURCES = \
-	plugin.c debug-info.h debug-info.c bin-info.c dwarf.c crc32.c utils.c
+	plugin.c debug-info.h debug-info.c bin-info.c dwarf.c crc32.c utils.c \
+	copy.c
 
 libbabeltrace_plugin_debug_info_la_LDFLAGS = \
 	-version-info $(BABELTRACE_LIBRARY_VERSION) -lelf -ldw

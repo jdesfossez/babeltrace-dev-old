@@ -35,13 +35,16 @@
 #include <babeltrace/component/notification/iterator.h>
 #include <babeltrace/component/notification/event.h>
 #include <babeltrace/component/notification/packet.h>
+#include <babeltrace/component/notification/stream.h>
 #include <plugins-common.h>
-#include "debug-info.h"
 #include <assert.h>
+#include "debug-info.h"
+#include "copy.h"
 
 static
 void destroy_debug_info_data(struct debug_info_component *debug_info)
 {
+	free(debug_info->arg_debug_info_field_name);
 	g_free(debug_info);
 }
 
@@ -68,6 +71,12 @@ end:
 }
 
 static
+void unref_debug_info(struct debug_info *debug_info)
+{
+	debug_info_destroy(debug_info);
+}
+
+static
 void debug_info_iterator_destroy(struct bt_notification_iterator *it)
 {
 	struct debug_info_iterator *it_data;
@@ -80,28 +89,37 @@ void debug_info_iterator_destroy(struct bt_notification_iterator *it)
 	}
 	bt_put(it_data->current_notification);
 	bt_put(it_data->input_iterator);
+	g_hash_table_destroy(it_data->trace_map);
+	g_hash_table_destroy(it_data->stream_map);
+	g_hash_table_destroy(it_data->stream_class_map);
+	g_hash_table_destroy(it_data->packet_map);
+	g_hash_table_destroy(it_data->trace_debug_map);
 	g_free(it_data);
 }
 
 static
-enum bt_component_status handle_notification(FILE *err,
+struct bt_notification *handle_notification(FILE *err,
 		struct debug_info_iterator *debug_it,
 		struct bt_notification *notification)
 {
-	enum bt_component_status ret = BT_COMPONENT_STATUS_OK;
+	struct bt_notification *new_notification = NULL;
 
 	switch (bt_notification_get_type(notification)) {
 	case BT_NOTIFICATION_TYPE_PACKET_BEGIN:
 	{
 		struct bt_ctf_packet *packet =
 			bt_notification_packet_begin_get_packet(notification);
+		struct bt_ctf_packet *writer_packet;
 
 		if (!packet) {
-			ret = BT_COMPONENT_STATUS_ERROR;
 			goto end;
 		}
 
-//		ret = writer_new_packet(writer_component, packet);
+		writer_packet = debug_info_new_packet(debug_it, packet);
+		assert(writer_packet);
+		new_notification = bt_notification_packet_begin_create(
+				writer_packet);
+		assert(new_notification);
 		bt_put(packet);
 		break;
 	}
@@ -109,12 +127,17 @@ enum bt_component_status handle_notification(FILE *err,
 	{
 		struct bt_ctf_packet *packet =
 			bt_notification_packet_end_get_packet(notification);
+		struct bt_ctf_packet *writer_packet;
 
 		if (!packet) {
-			ret = BT_COMPONENT_STATUS_ERROR;
 			goto end;
 		}
-//		ret = writer_close_packet(writer_component, packet);
+
+		writer_packet = debug_info_close_packet(debug_it, packet);
+		assert(writer_packet);
+		new_notification = bt_notification_packet_end_create(
+				writer_packet);
+		assert(new_notification);
 		bt_put(packet);
 		break;
 	}
@@ -122,27 +145,42 @@ enum bt_component_status handle_notification(FILE *err,
 	{
 		struct bt_ctf_event *event = bt_notification_event_get_event(
 				notification);
+		struct bt_ctf_event *writer_event;
 
 		if (!event) {
-			ret = BT_COMPONENT_STATUS_ERROR;
 			goto end;
 		}
-		ret = BT_COMPONENT_STATUS_OK;
-		printf("event\n");
-//		ret = writer_output_event(writer_component, event);
+		writer_event = debug_info_output_event(debug_it, event);
+		assert(writer_event);
+		new_notification = bt_notification_event_create(writer_event);
+		assert(new_notification);
 		bt_put(event);
-		if (ret != BT_COMPONENT_STATUS_OK) {
-			goto end;
-		}
 		break;
 	}
 	case BT_NOTIFICATION_TYPE_STREAM_END:
+	{
+		struct bt_ctf_stream *stream =
+			bt_notification_stream_end_get_stream(notification);
+		struct bt_ctf_stream *writer_stream;
+
+		if (!stream) {
+			goto end;
+		}
+
+		writer_stream = debug_info_stream_end(debug_it, stream);
+		assert(writer_stream);
+		new_notification = bt_notification_stream_end_create(
+				writer_stream);
+		assert(new_notification);
+		bt_put(stream);
 		break;
+	}
 	default:
 		puts("Unhandled notification type");
 	}
+
 end:
-	return ret;
+	return new_notification;
 }
 
 static
@@ -155,7 +193,7 @@ enum bt_notification_iterator_status debug_info_iterator_next(
 	struct bt_notification_iterator *source_it = NULL;
 	enum bt_notification_iterator_status ret =
 			BT_NOTIFICATION_ITERATOR_STATUS_OK;
-	struct bt_notification *notification;
+	struct bt_notification *notification, *new_notification;
 
 	debug_it = bt_notification_iterator_get_private_data(iterator);
 	assert(debug_it);
@@ -179,9 +217,12 @@ enum bt_notification_iterator_status debug_info_iterator_next(
 		goto end;
 	}
 
-	handle_notification(debug_info->err, debug_it, notification);
+	new_notification = handle_notification(debug_info->err, debug_it,
+			notification);
+	assert(new_notification);
+	bt_put(notification);
 
-	BT_MOVE(debug_it->current_notification, notification);
+	BT_MOVE(debug_it->current_notification, new_notification);
 
 end:
 	bt_put(component);
@@ -250,8 +291,21 @@ enum bt_notification_iterator_status debug_info_iterator_init(struct bt_componen
 		ret = BT_NOTIFICATION_ITERATOR_STATUS_NOMEM;
 		goto end;
 	}
+	it_data->debug_info_component = (struct debug_info_component *)
+		bt_component_get_private_data(component);
 
-	/* FIXME init debug_info_iterator */
+	it_data->err = it_data->debug_info_component->err;
+	it_data->trace_map = g_hash_table_new_full(g_direct_hash,
+			g_direct_equal, NULL, NULL);
+	it_data->stream_map = g_hash_table_new_full(g_direct_hash,
+			g_direct_equal, NULL, NULL);
+	it_data->stream_class_map = g_hash_table_new_full(g_direct_hash,
+			g_direct_equal, NULL, NULL);
+	it_data->packet_map = g_hash_table_new_full(g_direct_hash,
+			g_direct_equal, NULL, NULL);
+	it_data->trace_debug_map = g_hash_table_new_full(g_direct_hash,
+			g_direct_equal, NULL, (GDestroyNotify) unref_debug_info);
+
 	it_ret = bt_notification_iterator_set_private_data(iterator, it_data);
 	if (it_ret) {
 		goto end;
@@ -260,6 +314,98 @@ enum bt_notification_iterator_status debug_info_iterator_init(struct bt_componen
 end:
 	bt_put(connection);
 	bt_put(input_port);
+	return ret;
+}
+
+static
+enum bt_component_status init_from_params(
+		struct debug_info_component *debug_info_component,
+		struct bt_value *params)
+{
+	struct bt_value *value = NULL;
+	enum bt_component_status ret = BT_COMPONENT_STATUS_OK;
+
+	assert(params);
+
+        value = bt_value_map_get(params, "debug-info-field-name");
+	if (value) {
+		enum bt_value_status value_ret;
+		const char *tmp;
+
+		value_ret = bt_value_string_get(value, &tmp);
+		if (value_ret) {
+			ret = BT_COMPONENT_STATUS_INVALID;
+			printf_error("Failed to retrieve debug-info-field-name value. "
+					"Expecting a string");
+		}
+		strcpy(debug_info_component->arg_debug_info_field_name, tmp);
+		bt_put(value);
+	} else {
+		debug_info_component->arg_debug_info_field_name =
+			malloc(strlen("debug_info") + 1);
+		if (!debug_info_component->arg_debug_info_field_name) {
+			ret = BT_COMPONENT_STATUS_NOMEM;
+			printf_error();
+		}
+		sprintf(debug_info_component->arg_debug_info_field_name,
+				"debug_info");
+	}
+	if (ret != BT_COMPONENT_STATUS_OK) {
+		goto end;
+	}
+
+        value = bt_value_map_get(params, "debug-dir");
+	if (value) {
+		enum bt_value_status value_ret;
+
+		value_ret = bt_value_string_get(value,
+				&debug_info_component->arg_debug_dir);
+		if (value_ret) {
+			ret = BT_COMPONENT_STATUS_INVALID;
+			printf_error("Failed to retrieve debug-dir value. "
+					"Expecting a string");
+		}
+	}
+	bt_put(value);
+	if (ret != BT_COMPONENT_STATUS_OK) {
+		goto end;
+	}
+
+        value = bt_value_map_get(params, "target-prefix");
+	if (value) {
+		enum bt_value_status value_ret;
+
+		value_ret = bt_value_string_get(value,
+				&debug_info_component->arg_target_prefix);
+		if (value_ret) {
+			ret = BT_COMPONENT_STATUS_INVALID;
+			printf_error("Failed to retrieve target-prefix value. "
+					"Expecting a string");
+		}
+	}
+	bt_put(value);
+	if (ret != BT_COMPONENT_STATUS_OK) {
+		goto end;
+	}
+
+        value = bt_value_map_get(params, "full-path");
+	if (value) {
+		enum bt_value_status value_ret;
+
+		value_ret = bt_value_bool_get(value,
+				&debug_info_component->arg_full_path);
+		if (value_ret) {
+			ret = BT_COMPONENT_STATUS_INVALID;
+			printf_error("Failed to retrieve full-path value. "
+					"Expecting a boolean");
+		}
+	}
+	bt_put(value);
+	if (ret != BT_COMPONENT_STATUS_OK) {
+		goto end;
+	}
+
+end:
 	return ret;
 }
 
@@ -280,7 +426,7 @@ enum bt_component_status debug_info_component_init(
 		goto error;
 	}
 
-//	ret = init_from_params(debug_info, params);
+	ret = init_from_params(debug_info, params);
 end:
 	return ret;
 error:

@@ -113,7 +113,7 @@ void bin_info_destroy(struct bin_info *bin)
 
 	free(bin->elf_path);
 	free(bin->dwarf_path);
-	free(bin->build_id);
+	g_free(bin->build_id);
 	free(bin->dbg_link_filename);
 
 	elf_end(bin->elf_file);

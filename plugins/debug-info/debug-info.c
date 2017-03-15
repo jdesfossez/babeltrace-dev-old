@@ -30,6 +30,7 @@
 #include "debug-info.h"
 #include "bin-info.h"
 #include "utils.h"
+#include "copy.h"
 
 struct proc_debug_info_sources {
 	/*
@@ -312,11 +313,7 @@ struct debug_info_source *debug_info_query(struct debug_info *debug_info,
 		goto end;
 	}
 
-	dbg_info_src = proc_debug_info_sources_get_entry(
-			proc_dbg_info_src, ip);
-	if (!dbg_info_src) {
-		goto end;
-	}
+	dbg_info_src = proc_debug_info_sources_get_entry(proc_dbg_info_src, ip);
 
 end:
 	return dbg_info_src;
@@ -368,77 +365,32 @@ end:
 	return;
 }
 
-#if 0
 static
-void handle_statedump_build_id_event(struct debug_info *debug_info,
+void handle_statedump_build_id_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
 	struct proc_debug_info_sources *proc_dbg_info_src;
-	struct bt_definition *event_fields_def = NULL;
-	struct bt_definition *sec_def = NULL;
-	struct bt_definition *baddr_def = NULL;
-	struct bt_definition *vpid_def = NULL;
-	struct bt_definition *build_id_def = NULL;
-	struct definition_sequence *build_id_seq;
 	struct bin_info *bin = NULL;
-	int i;
+	int ret;
 	int64_t vpid;
 	uint64_t baddr;
-	uint8_t *build_id = NULL;
-	uint64_t build_id_len;
 
-	event_fields_def = (struct bt_definition *) event_def->fields;
-	sec_def = (struct bt_definition *)
-			event_def->stream->stream_event_context;
-
-	if (!event_fields_def || !sec_def) {
+	ret = get_stream_event_context_int_field_value(err,
+			event, "_vpid", &vpid);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
 
-	baddr_def = bt_lookup_definition(event_fields_def, "_baddr");
-	if (!baddr_def) {
+	ret = get_payload_unsigned_int_field_value(err,
+			event, "_baddr", &baddr);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
-	}
-
-	vpid_def = bt_lookup_definition(sec_def, "_vpid");
-	if (!vpid_def) {
-		goto end;
-	}
-
-	build_id_def = bt_lookup_definition(event_fields_def, "_build_id");
-	if (!build_id_def) {
-		goto end;
-	}
-
-	if (baddr_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (vpid_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (build_id_def->declaration->id != BT_CTF_TYPE_ID_SEQUENCE) {
-		goto end;
-	}
-
-	baddr = bt_get_unsigned_int(baddr_def);
-	vpid = bt_get_signed_int(vpid_def);
-	build_id_seq = container_of(build_id_def,
-			struct definition_sequence, p);
-	build_id_len = build_id_seq->length->value._unsigned;
-
-	build_id = g_malloc(build_id_len);
-	if (!build_id) {
-		goto end;
-	}
-
-	for (i = 0; i < build_id_len; ++i) {
-		struct bt_definition **field;
-
-		field = (struct bt_definition **) &g_ptr_array_index(
-				build_id_seq->elems, i);
-		build_id[i] = bt_get_unsigned_int(*field);
 	}
 
 	proc_dbg_info_src = proc_debug_info_sources_ht_get_entry(
@@ -457,152 +409,77 @@ void handle_statedump_build_id_event(struct debug_info *debug_info,
 		goto end;
 	}
 
-	bin_info_set_build_id(bin, build_id, build_id_len);
-
-end:
-	free(build_id);
-	return;
-}
-#endif
-
-static
-struct bt_ctf_field *get_field(struct bt_ctf_field *context,
-		struct bt_ctf_event *event, const char *field_name,
-		struct bt_ctf_field_type *field_type)
-{
-	struct bt_ctf_field *field = NULL;
-	struct bt_ctf_field_type *struct_type;
-	int ret, index;
-	const char *name;
-
-	struct_type = bt_ctf_field_get_type(context);
-	if (!struct_type) {
+	ret = get_payload_build_id_field_value(err, event, "_build_id",
+			&bin->build_id, &bin->build_id_len);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
 		ret = -1;
 		goto end;
 	}
 
 	/*
-	index = bt_ctf_field_type_structure_get_field_name_index(struct_type,
-			field_name);
-	if (index < 0) {
-		ret = -1;
-		goto end_put_type;
-	}
-	*/
-	return NULL;
+	 * Reset the is_elf_only flag in case it had been set
+	 * previously, because we might find separate debug info using
+	 * the new build id information.
+	 */
+	bin->is_elf_only = false;
 
-	field =  bt_ctf_field_structure_get_field_by_index(context, index);
-	if (!field) {
-		ret = -1;
-		goto end_put_type;
-	}
+	// TODO
+	//	bin_info_set_build_id(bin, build_id, build_id_len);
 
-	ret = bt_ctf_field_type_structure_get_field(struct_type, &name,
-			&field_type, index);
-	if (ret < 0) {
-		ret = -1;
-		bt_put(field);
-		goto end_put_type;
-	}
-
-end_put_type:
-	bt_put(struct_type);
 end:
-	return field;
+	return;
 }
 
-#if 0
 static
-void handle_statedump_debug_link_event(struct debug_info *debug_info,
+void handle_statedump_debug_link_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
 	struct proc_debug_info_sources *proc_dbg_info_src;
 	struct bin_info *bin = NULL;
 	int64_t vpid;
-	uint64_t baddr, ret_uint64_t;
+	uint64_t baddr;
 	const char *filename = NULL;
 	uint32_t crc32;
+	uint64_t tmp;
 	int ret;
 
-
-	struct bt_ctf_field *context;
-	struct bt_ctf_field *field;
-	struct bt_ctf_field_type *field_type = NULL;
-
-	context = bt_ctf_event_get_stream_event_context(event);
-	if (!context) {
+	ret = get_stream_event_context_int_field_value(err, event,
+			"_vpid", &vpid);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
 		ret = -1;
 		goto end;
 	}
 
-	field = get_field(context, event, "_vpid", field_type);
-	if (!field) {
-		goto end_put_context;
-	}
-	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
-		goto end_put_field;
-	}
-	ret = bt_ctf_field_signed_integer_get_value(field, &vpid);
-	if (ret < 0) {
-		goto end_put_field;
-	}
-
-	bt_put(field);
-	bt_put(field_type);
-	bt_put(context);
-
-	context = bt_ctf_event_get_payload_field(event);
-	if (!context) {
+	ret = get_payload_unsigned_int_field_value(err,
+			event, "_baddr", &baddr);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
 		ret = -1;
 		goto end;
 	}
 
-	field = get_field(context, event, "_baddr", field_type);
-	if (!field) {
-		goto end_put_context;
+	ret = get_payload_unsigned_int_field_value(err, event, "_crc32", &tmp);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
+		goto end;
 	}
-	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
-		goto end_put_field;
-	}
-	ret = bt_ctf_field_unsigned_integer_get_value(field, &baddr);
-	if (ret < 0) {
-		goto end_put_field;
-	}
+	crc32 = (uint32_t) tmp;
 
-	bt_put(field);
-	bt_put(field_type);
-
-	field = get_field(context, event, "_crc32", field_type);
-	if (!field) {
-		goto end_put_context;
+	ret = get_payload_string_field_value(err,
+			event, "_filename", &filename);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
+		goto end;
 	}
-	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_INTEGER) {
-		goto end_put_field;
-	}
-	ret = bt_ctf_field_unsigned_integer_get_value(field, &ret_uint64_t);
-	if (ret < 0) {
-		goto end_put_field;
-	}
-	crc32 = (uint32_t) ret_uint64_t;
-
-	bt_put(field);
-	bt_put(field_type);
-
-	field = get_field(context, event, "_filename", field_type);
-	if (!field) {
-		goto end_put_context;
-	}
-	if (bt_ctf_field_type_get_type_id(field_type) != BT_CTF_TYPE_ID_STRING) {
-		goto end_put_field;
-	}
-	filename = bt_ctf_field_string_get_value(field);
-	if (!filename) {
-		goto end_put_field;
-	}
-
-	bt_put(field);
-	bt_put(field_type);
-	bt_put(context);
 
 	proc_dbg_info_src = proc_debug_info_sources_ht_get_entry(
 			debug_info->vpid_to_proc_dbg_info_src, vpid);
@@ -622,28 +499,14 @@ void handle_statedump_debug_link_event(struct debug_info *debug_info,
 
 	bin_info_set_debug_link(bin, filename, crc32);
 
-	goto end;
-
-end_put_context:
-	bt_put(context);
-end_put_field:
-	bt_put(field);
-	bt_put(field_type);
 end:
 	return;
 }
 
 static
-void handle_bin_info_event(struct debug_info *debug_info,
+void handle_bin_info_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event, bool has_pic_field)
 {
-	struct bt_definition *baddr_def = NULL;
-	struct bt_definition *memsz_def = NULL;
-	struct bt_definition *path_def = NULL;
-	struct bt_definition *is_pic_def = NULL;
-	struct bt_definition *vpid_def = NULL;
-	struct bt_definition *event_fields_def = NULL;
-	struct bt_definition *sec_def = NULL;
 	struct proc_debug_info_sources *proc_dbg_info_src;
 	struct bin_info *bin;
 	uint64_t baddr, memsz;
@@ -651,41 +514,47 @@ void handle_bin_info_event(struct debug_info *debug_info,
 	const char *path;
 	gpointer key = NULL;
 	bool is_pic;
+	int ret;
 
-	event_fields_def = (struct bt_definition *) event_def->fields;
-	sec_def = (struct bt_definition *)
-		event_def->stream->stream_event_context;
-
-	if (!event_fields_def || !sec_def) {
+	ret = get_payload_unsigned_int_field_value(err,
+			event, "_baddr", &baddr);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
 
-	baddr_def = bt_lookup_definition(event_fields_def, "_baddr");
-	if (!baddr_def) {
+	ret = get_payload_unsigned_int_field_value(err,
+			event, "_memsz", &memsz);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
 
-	memsz_def = bt_lookup_definition(event_fields_def, "_memsz");
-	if (!memsz_def) {
-		goto end;
-	}
-
-	path_def = bt_lookup_definition(event_fields_def, "_path");
-	if (!path_def) {
+	ret = get_payload_string_field_value(err,
+			event, "_path", &path);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
 
 	if (has_pic_field) {
-		is_pic_def = bt_lookup_definition(event_fields_def, "_is_pic");
-		if (!is_pic_def) {
+		uint64_t tmp;
+
+		ret = get_payload_unsigned_int_field_value(err,
+				event, "_is_pic", &tmp);
+		if (ret) {
+			fprintf(err, "[error] %s in %s:%d\n", __func__,
+					__FILE__, __LINE__);
+			ret = -1;
 			goto end;
 		}
-
-		if (is_pic_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-			goto end;
-		}
-
-		is_pic = (bt_get_unsigned_int(is_pic_def) == 1);
+		is_pic = (tmp == 1);
 	} else {
 		/*
 		 * dlopen has no is_pic field, because the shared
@@ -694,31 +563,14 @@ void handle_bin_info_event(struct debug_info *debug_info,
 		is_pic = true;
 	}
 
-	vpid_def = bt_lookup_definition(sec_def, "_vpid");
-	if (!vpid_def) {
+	ret = get_stream_event_context_int_field_value(err, event, "_vpid",
+			&vpid);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
-
-	if (baddr_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (memsz_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	if (path_def->declaration->id != BT_CTF_TYPE_ID_STRING) {
-		goto end;
-	}
-
-	if (vpid_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	baddr = bt_get_unsigned_int(baddr_def);
-	memsz = bt_get_unsigned_int(memsz_def);
-	path = bt_get_string(path_def);
-	vpid = bt_get_signed_int(vpid_def);
 
 	if (!path) {
 		goto end;
@@ -764,58 +616,46 @@ end:
 }
 
 static inline
-void handle_statedump_bin_info_event(struct debug_info *debug_info,
+void handle_statedump_bin_info_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
-	handle_bin_info_event(debug_info, event, true);
+	handle_bin_info_event(err, debug_info, event, true);
 }
 
 static inline
-void handle_lib_load_event(struct debug_info *debug_info,
+void handle_lib_load_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
-	handle_bin_info_event(debug_info, event, false);
+	handle_bin_info_event(err, debug_info, event, false);
 }
 
 static inline
-void handle_lib_unload_event(struct debug_info *debug_info,
+void handle_lib_unload_event(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
-	struct bt_definition *baddr_def = NULL;
-	struct bt_definition *event_fields_def = NULL;
-	struct bt_definition *sec_def = NULL;
-	struct bt_definition *vpid_def = NULL;
 	struct proc_debug_info_sources *proc_dbg_info_src;
 	uint64_t baddr;
 	int64_t vpid;
 	gpointer key_ptr = NULL;
+	int ret;
 
-	event_fields_def = (struct bt_definition *) event_def->fields;
-	sec_def = (struct bt_definition *)
-			event_def->stream->stream_event_context;
-	if (!event_fields_def || !sec_def) {
+	ret = get_payload_unsigned_int_field_value(err,
+			event, "_baddr", &baddr);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
 
-	baddr_def = bt_lookup_definition(event_fields_def, "_baddr");
-	if (!baddr_def) {
+	ret = get_stream_event_context_int_field_value(err, event, "_vpid",
+			&vpid);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
-
-	vpid_def = bt_lookup_definition(sec_def, "_vpid");
-	if (!vpid_def) {
-		goto end;
-	}
-
-	if (baddr_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-	if (vpid_def->declaration->id != BT_CTF_TYPE_ID_INTEGER) {
-		goto end;
-	}
-
-	baddr = bt_get_unsigned_int(baddr_def);
-	vpid = bt_get_signed_int(vpid_def);
 
 	proc_dbg_info_src = proc_debug_info_sources_ht_get_entry(
 			debug_info->vpid_to_proc_dbg_info_src, vpid);
@@ -831,26 +671,21 @@ end:
 }
 
 static
-void handle_statedump_start(struct debug_info *debug_info,
+void handle_statedump_start(FILE *err, struct debug_info *debug_info,
 		struct bt_ctf_event *event)
 {
-	struct bt_definition *vpid_def = NULL;
-	struct bt_definition *sec_def = NULL;
 	struct proc_debug_info_sources *proc_dbg_info_src;
 	int64_t vpid;
+	int ret;
 
-	sec_def = (struct bt_definition *)
-			event_def->stream->stream_event_context;
-	if (!sec_def) {
+	ret = get_stream_event_context_int_field_value(err, event,
+			"_vpid", &vpid);
+	if (ret) {
+		fprintf(err, "[error] %s in %s:%d\n", __func__,
+				__FILE__, __LINE__);
+		ret = -1;
 		goto end;
 	}
-
-	vpid_def = bt_lookup_definition(sec_def, "_vpid");
-	if (!vpid_def) {
-		goto end;
-	}
-
-	vpid = bt_get_signed_int(vpid_def);
 
 	proc_dbg_info_src = proc_debug_info_sources_ht_get_entry(
 			debug_info->vpid_to_proc_dbg_info_src, vpid);
@@ -865,71 +700,30 @@ end:
 	return;
 }
 
-static
-void register_event_debug_infos(struct debug_info *debug_info,
-		struct bt_ctf_event_class *event)
-{
-	struct bt_definition *ip_def, *vpid_def;
-	int64_t vpid;
-	uint64_t ip;
-	struct bt_definition *sec_def;
-
-	/* Get stream event context definition. */
-	sec_def = (struct bt_definition *) event->stream->stream_event_context;
-	if (!sec_def) {
-		goto end;
-	}
-
-	/* Get "ip" and "vpid" definitions. */
-	vpid_def = bt_lookup_definition((struct bt_definition *) sec_def,
-			 "_vpid");
-	ip_def = bt_lookup_definition((struct bt_definition *) sec_def, "_ip");
-
-	if (!vpid_def || !ip_def) {
-		 goto end;
-	}
-
-	vpid = bt_get_signed_int(vpid_def);
-	ip = bt_get_unsigned_int(ip_def);
-
-	/* Get debug info for this context. */
-	((struct definition_integer *) ip_def)->debug_info_src =
-			debug_info_query(debug_info, vpid, ip);
-
-end:
-	return;
-}
-#endif
-
 BT_HIDDEN
-void debug_info_handle_event(struct bt_ctf_trace *trace_class,
-		struct bt_ctf_event *event)
+void debug_info_handle_event(FILE *err, struct bt_ctf_event *event,
+		struct debug_info *debug_info)
 {
 	struct bt_ctf_event_class *event_class;
-	//struct debug_info *debug_info = trace_class->debug_info;
-	struct debug_info *debug_info = NULL;
 	const char *event_name;
 	GQuark q_event_name;
 
-	if (!trace_class || !debug_info || !event) {
+	if (!debug_info || !event) {
 		goto end;
 	}
-
 	event_class = bt_ctf_event_get_class(event);
 	if (!event_class) {
 		goto end;
 	}
-
 	event_name = bt_ctf_event_class_get_name(event_class);
 	if (!event_name) {
 		goto end_put_class;
 	}
 	q_event_name = g_quark_try_string(event_name);
 
-#if 0
 	if (q_event_name == debug_info->q_statedump_bin_info) {
 		/* State dump */
-		handle_statedump_bin_info_event(debug_info, event);
+		handle_statedump_bin_info_event(err, debug_info, event);
 	} else if (q_event_name == debug_info->q_dl_open ||
 			q_event_name == debug_info->q_lib_load) {
 		/*
@@ -941,23 +735,19 @@ void debug_info_handle_event(struct bt_ctf_trace *trace_class,
 		 * of the dlopen family are called (e.g. dlmopen) and when
 		 * library are transitively loaded.
 		 */
-		handle_lib_load_event(debug_info, event);
+		handle_lib_load_event(err, debug_info, event);
 	} else if (q_event_name == debug_info->q_statedump_start) {
 		/* Start state dump */
-		handle_statedump_start(debug_info, event);
+		handle_statedump_start(err, debug_info, event);
 	} else if (q_event_name == debug_info->q_statedump_debug_link) {
 		/* Debug link info */
-		handle_statedump_debug_link_event(debug_info, event);
+		handle_statedump_debug_link_event(err, debug_info, event);
 	} else if (q_event_name == debug_info->q_statedump_build_id) {
 		/* Build ID info */
-		handle_statedump_build_id_event(debug_info, event);
+		handle_statedump_build_id_event(err, debug_info, event);
 	} else if (q_event_name == debug_info-> q_lib_unload) {
-		handle_lib_unload_event(debug_info, event);
+		handle_lib_unload_event(err, debug_info, event);
 	}
-#endif
-
-	/* All events: register debug infos */
-//	register_event_debug_infos(debug_info, event);
 
 end_put_class:
 	bt_put(event_class);
