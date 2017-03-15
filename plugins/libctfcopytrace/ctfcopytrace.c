@@ -757,6 +757,7 @@ struct bt_ctf_event *ctf_copy_event(FILE *err, struct bt_ctf_event *event,
 	} else {
 		ret = ctf_copy_event_header(err, event, writer_event_class,
 				writer_event, field);
+		bt_put(field);
 		if (ret) {
 			BT_PUT(writer_event);
 			fprintf(err, "[error] %s in %s:%d\n", __func__,
@@ -772,12 +773,12 @@ struct bt_ctf_event *ctf_copy_event(FILE *err, struct bt_ctf_event *event,
 	if (copy_field) {
 		ret = bt_ctf_event_set_stream_event_context(writer_event,
 				copy_field);
+		bt_put(copy_field);
 		if (ret < 0) {
 			fprintf(err, "[error] %s in %s:%d\n", __func__,
 					__FILE__, __LINE__);
 			goto error;
 		}
-		bt_put(copy_field);
 	}
 
 	/* Optional field, so it can fail silently. */
@@ -786,12 +787,12 @@ struct bt_ctf_event *ctf_copy_event(FILE *err, struct bt_ctf_event *event,
 	bt_put(field);
 	if (copy_field) {
 		ret = bt_ctf_event_set_event_context(writer_event, copy_field);
+		bt_put(copy_field);
 		if (ret < 0) {
 			fprintf(err, "[error] %s in %s:%d\n", __func__,
 					__FILE__, __LINE__);
 			goto error;
 		}
-		bt_put(copy_field);
 	}
 
 	field = bt_ctf_event_get_payload_field(event);
@@ -805,17 +806,16 @@ struct bt_ctf_event *ctf_copy_event(FILE *err, struct bt_ctf_event *event,
 	bt_put(field);
 	if (copy_field) {
 		ret = bt_ctf_event_set_payload_field(writer_event, copy_field);
+		bt_put(copy_field);
 		if (ret < 0) {
 			fprintf(err, "[error] %s in %s:%d\n", __func__,
 					__FILE__, __LINE__);
 			goto error;
 		}
-		bt_put(copy_field);
 	}
 	goto end;
 
 error:
-	bt_put(copy_field);
 	BT_PUT(writer_event);
 end:
 	return writer_event;
@@ -879,7 +879,6 @@ enum bt_component_status ctf_copy_trace(FILE *err, struct bt_ctf_trace *trace,
 end_put_header_type:
 	bt_put(header_type);
 end_put_writer_trace:
-	bt_put(writer_trace);
 	return ret;
 }
 
