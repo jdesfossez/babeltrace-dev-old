@@ -1,11 +1,8 @@
+#ifndef BABELTRACE_CTF_EVENT_H
+#define BABELTRACE_CTF_EVENT_H
+
 /*
- * babeltrace.c
- *
- * Babeltrace Library
- *
- * Copyright 2010-2011 EfficiOS Inc. and Linux Foundation
- *
- * Author: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+ * Copyright 2017 Philippe Proulx <pproulx@efficios.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,20 +21,21 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * The Common Trace Format (CTF) Specification is available at
+ * http://www.efficios.com/ctf
  */
 
-#include <babeltrace/babeltrace.h>
-#include <babeltrace/context.h>
-#include <stdlib.h>
-#include <stdbool.h>
+/*
+ * This header still exists for backward compatibility reasons because
+ * CTF writer needed it to be included.
+ */
 
-bool babeltrace_verbose, babeltrace_debug;
+#include <babeltrace/ctf-writer/clock.h>
+#include <babeltrace/ctf-writer/event-fields.h>
+#include <babeltrace/ctf-writer/event-types.h>
+#include <babeltrace/ctf-writer/stream-class.h>
+#include <babeltrace/ctf-writer/stream.h>
+#include <babeltrace/ctf-writer/writer.h>
 
-static
-void __attribute__((constructor)) init_babeltrace_lib(void)
-{
-	if (getenv("BABELTRACE_VERBOSE"))
-		babeltrace_verbose = 1;
-	if (getenv("BABELTRACE_DEBUG"))
-		babeltrace_debug = 1;
-}
+#endif /* BABELTRACE_CTF_EVENT_H */
